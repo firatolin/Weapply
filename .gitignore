@@ -1,0 +1,45 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# builds
+dist
+build
+.next
+out
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# testing
+coverage
+.nyc_output
+
+# misc
+*.pem
+*.p12
+*.pfx
+
+# vercel
+.vercel
+
+# turbo
+.turbo

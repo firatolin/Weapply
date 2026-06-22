@@ -1,0 +1,30 @@
+﻿{
+  "name": "applyai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "start": "turbo start",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "clean": "turbo clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @applyai/db generate",
+    "db:migrate": "pnpm --filter @applyai/db migrate",
+    "db:seed": "pnpm --filter @applyai/db seed",
+    "dev:web": "pnpm --filter @applyai/web dev",
+    "dev:api": "pnpm --filter @applyai/api dev"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prettier": "^3.0.0",
+    "turbo": "^1.13.0",
+    "typescript": "^5.3.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
