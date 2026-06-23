@@ -6,9 +6,12 @@ export function Header() {
     <header className="border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="text-xl font-bold">
-          Weapply
+          ApplyAI
         </Link>
         <nav className="flex items-center gap-6">
+          <Link to="/scholarships" className="text-sm hover:text-primary">
+            Scholarships
+          </Link>
           <Link to="/dashboard" className="text-sm hover:text-primary">
             Dashboard
           </Link>
