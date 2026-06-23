@@ -47,3 +47,57 @@ model Profile {
 
   @@index([userId])
 }
+
+// Scholarship table - stores scholarship opportunities
+model Scholarship {
+  id                String    @id @default(cuid())
+  name              String
+  description       String?   @db.Text
+  provider          String
+  providerType      String    // UNIVERSITY, GOVERNMENT, PRIVATE, NGO, OTHER
+  
+  // Eligibility
+  eligibilityRules  Json?     // { gpaMin: 3.0, nationality: ["US"], educationLevel: ["BACHELORS"] }
+  targetFields      String[]  // ["Computer Science", "Engineering"]
+  targetNationalities String[]
+  targetCountries   String[]
+  educationLevels   String[]  // HIGH_SCHOOL, BACHELORS, MASTERS, PHD
+  
+  // Financial
+  amountMin         Int?      // in cents USD
+  amountMax         Int?      // in cents USD
+  amountCurrency    String    @default("USD")
+  scholarshipType   String    // FULL, PARTIAL, MERIT_BASED, NEED_BASED, RESEARCH, DIVERSITY
+  
+  // Deadlines
+  applicationDeadline DateTime?
+  decisionDate      DateTime?
+  notificationDate  DateTime?
+  
+  // Application
+  applicationURL    String?
+  applicationFee    Int?      // in cents USD
+  requiredDocuments String[] // ["Transcript", "CV", "SOP", "Recommendation Letters"]
+  essayPrompt       String?   @db.Text
+  
+  // Metadata
+  tags              String[]
+  isVerified        Boolean   @default(false)
+  lastVerifiedAt    DateTime?
+  source            String    // "API_IMPORT", "ADMIN_CREATED", "USER_SUBMITTED"
+  viewCount         Int       @default(0)
+  matchCount        Int       @default(0)
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  // Indexes for faster queries
+  @@index([provider])
+  @@index([applicationDeadline])
+  @@index([scholarshipType])
+  @@index([isVerified])
+  @@index([deletedAt])
+  @@index([tags]) // For search
+}

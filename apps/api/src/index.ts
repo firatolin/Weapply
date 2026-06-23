@@ -7,16 +7,19 @@ import { config } from './config/index.js';
 import { errorHandler } from './middleware/error.js';
 import { logger } from './utils/logger.js';
 import { healthRouter } from './routes/health.js';
+import { scholarshipRouter } from './routes/scholarships.js';
 
-const app = express();
+const app: express.Application = express();
 const port = config.PORT;
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: config.CORS_ORIGINS,
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: config.CORS_ORIGINS,
+    credentials: true,
+  })
+);
 
 // Compression
 app.use(compression());
@@ -32,9 +35,9 @@ const limiter = rateLimit({
   message: {
     error: {
       code: 'RATE_LIMITED',
-      message: 'Too many requests, please try again later.'
-    }
-  }
+      message: 'Too many requests, please try again later.',
+    },
+  },
 });
 app.use('/api', limiter);
 
@@ -42,7 +45,7 @@ app.use('/api', limiter);
 app.use((req: Request, res: Response, next: NextFunction) => {
   logger.info(`${req.method} ${req.path}`, {
     ip: req.ip,
-    userAgent: req.get('user-agent')
+    userAgent: req.get('user-agent'),
   });
   next();
 });
@@ -55,8 +58,8 @@ app.get('/', (req: Request, res: Response) => {
     status: 'running',
     endpoints: {
       health: '/health',
-      api: '/api/v1'
-    }
+      api: '/api/v1',
+    },
   });
 });
 
@@ -65,14 +68,15 @@ app.use('/health', healthRouter);
 
 // API routes
 app.use('/api/v1/health', healthRouter);
+app.use('/api/v1/scholarships', scholarshipRouter);
 
 // 404 handler for undefined routes
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: {
       code: 'NOT_FOUND',
-      message: `Route ${req.method} ${req.path} not found`
-    }
+      message: `Route ${req.method} ${req.path} not found`,
+    },
   });
 });
 
@@ -84,6 +88,7 @@ app.listen(port, () => {
   logger.info(` Server running on port ${port}`);
   logger.info(` Environment: ${config.NODE_ENV}`);
   logger.info(` Health check: http://localhost:${port}/health`);
+  logger.info(`📍 Scholarships API: http://localhost:${port}/api/v1/scholarships`);
 });
 
 export { app };
