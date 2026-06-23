@@ -6,7 +6,7 @@ export function Header() {
     <header className="border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="text-xl font-bold">
-          ApplyAI
+          Weapply
         </Link>
         <nav className="flex items-center gap-6">
           <Link to="/dashboard" className="text-sm hover:text-primary">

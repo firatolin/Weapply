@@ -4,7 +4,7 @@ export function DashboardPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold">Dashboard</h1>
-      <p className="text-muted-foreground mt-2">Welcome to your ApplyAI dashboard</p>
+      <p className="text-muted-foreground mt-2">Welcome to your Weapply dashboard</p>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-8">
         <Card>
