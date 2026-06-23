@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getScholarships, Scholarship } from '../api/scholarships';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,9 +161,11 @@ export function ScholarshipsPage() {
                   </div>
 
                   <div className="mt-4 flex gap-2">
-                    <Button variant="outline" className="flex-1" size="sm">
-                      View Details
-                    </Button>
+                    <Link to={`/scholarships/${scholarship.id}`} className="flex-1">
+                      <Button variant="outline" className="w-full" size="sm">
+                        View Details
+                      </Button>
+                    </Link>
                     {scholarship.applicationURL && (
                       <Button
                         variant="default"
