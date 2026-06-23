@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User table - stores all user accounts
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  displayName   String?
+  photoURL      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  // Relationships
+  profile       Profile?
+
+  @@index([email])
+  @@index([deletedAt])
+}
+
+// Profile table - stores user profile information
+model Profile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime?
+  nationality       String?
+  countryOfResidence String?
+  educationLevel    String?   // HIGH_SCHOOL, BACHELORS, MASTERS, PHD
+  gpa               Float?
+  fieldsOfInterest  String[]  // ["Computer Science", "Data Science"]
+  targetCountries   String[]
+  budgetRange       Json?     // { min: 0, max: 50000, currency: "USD" }
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relationship - Fixed!
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
