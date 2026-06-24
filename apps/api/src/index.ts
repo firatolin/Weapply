@@ -53,7 +53,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Root route
 app.get('/', (req: Request, res: Response) => {
   res.json({
-    name: 'ApplyAI API',
+    name: 'Weapply API',
     version: '0.1.0',
     status: 'running',
     endpoints: {
