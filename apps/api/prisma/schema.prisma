@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  uid           String    @unique
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  displayName   String?
+  photoURL      String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  profile       Profile?
+  scholarships  Scholarship[] @relation("UserScholarships")
+
+  @@index([uid])
+  @@index([email])
+  @@index([deletedAt])
+}
+
+model Profile {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime?
+  nationality       String?
+  countryOfResidence String?
+  educationLevel    String?
+  gpa               Float?
+  fieldsOfInterest  String[]
+  targetCountries   String[]
+  budgetRange       Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Scholarship {
+  id                String    @id @default(cuid())
+  name              String
+  description       String?   @db.Text
+  provider          String
+  providerType      String
+  scholarshipType   String
+  
+  eligibilityRules  Json?
+  targetFields      String[]
+  targetNationalities String[]
+  targetCountries   String[]
+  educationLevels   String[]
+  
+  amountMin         Int?
+  amountMax         Int?
+  amountCurrency    String    @default("USD")
+  
+  applicationDeadline DateTime?
+  decisionDate      DateTime?
+  notificationDate  DateTime?
+  
+  applicationURL    String?
+  applicationFee    Int?
+  requiredDocuments String[]
+  essayPrompt       String?   @db.Text
+  
+  tags              String[]
+  isVerified        Boolean   @default(false)
+  lastVerifiedAt    DateTime?
+  source            String
+  viewCount         Int       @default(0)
+  matchCount        Int       @default(0)
+  
+  createdBy         String?
+  createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([provider])
+  @@index([applicationDeadline])
+  @@index([scholarshipType])
+  @@index([isVerified])
+  @@index([deletedAt])
+  @@index([tags])
+}
