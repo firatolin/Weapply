@@ -66,7 +66,11 @@ router.post('/sync', async (req: Request, res: Response) => {
     let user;
     try {
       user = await UserService.findOrCreateUser(firebaseUser);
-      console.log('💾 User saved to database:', user.id);
+      if (user) {
+        console.log('💾 User saved to database:', user.id);
+      } else {
+        console.error('❌ User is null or undefined');
+      }
     } catch (dbError) {
       console.error('❌ Database error:', dbError);
       return res.status(500).json({

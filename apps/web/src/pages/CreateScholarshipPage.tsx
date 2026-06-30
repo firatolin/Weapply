@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { createScholarship } from '../api/scholarships';
 
-// shadcn components
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,24 +28,17 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
-// Validation schema
+// Validation schema - UPDATED
 const scholarshipSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters'),
   description: z.string().optional(),
   provider: z.string().min(2, 'Provider is required'),
   providerType: z.enum(['UNIVERSITY', 'GOVERNMENT', 'PRIVATE', 'NGO', 'OTHER']),
-  scholarshipType: z.enum([
-    'FULL',
-    'PARTIAL',
-    'MERIT_BASED',
-    'NEED_BASED',
-    'RESEARCH',
-    'DIVERSITY',
-  ]),
+  scholarshipType: z.enum(['FULL', 'PARTIAL', 'MERIT_BASED', 'NEED_BASED', 'RESEARCH', 'DIVERSITY']),
   amountMin: z.coerce.number().positive().optional(),
   amountMax: z.coerce.number().positive().optional(),
   applicationDeadline: z.string().optional(),
-  applicationURL: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
+  applicationURL: z.string().url('Please enter a valid URL').optional().or(z.literal('')).or(z.null()),
   targetFields: z.string().optional(),
   targetCountries: z.string().optional(),
   targetNationalities: z.string().optional(),
@@ -95,38 +87,19 @@ export function CreateScholarshipPage() {
         applicationDeadline: data.applicationDeadline
           ? new Date(data.applicationDeadline).toISOString()
           : undefined,
-        applicationURL: data.applicationURL || undefined,
-        targetFields:
-          data.targetFields
-            ?.split(',')
-            .map((s) => s.trim())
-            .filter(Boolean) || [],
-        targetCountries:
-          data.targetCountries
-            ?.split(',')
-            .map((s) => s.trim())
-            .filter(Boolean) || [],
-        targetNationalities:
-          data.targetNationalities
-            ?.split(',')
-            .map((s) => s.trim())
-            .filter(Boolean) || [],
-        educationLevels:
-          data.educationLevels
-            ?.split(',')
-            .map((s) => s.trim())
-            .filter(Boolean) || [],
-        tags:
-          data.tags
-            ?.split(',')
-            .map((s) => s.trim())
-            .filter(Boolean) || [],
+        applicationURL: data.applicationURL && data.applicationURL.trim() !== '' ? data.applicationURL : undefined,
+        targetFields: data.targetFields?.split(',').map((s) => s.trim()).filter(Boolean) || [],
+        targetCountries: data.targetCountries?.split(',').map((s) => s.trim()).filter(Boolean) || [],
+        targetNationalities: data.targetNationalities?.split(',').map((s) => s.trim()).filter(Boolean) || [],
+        educationLevels: data.educationLevels?.split(',').map((s) => s.trim()).filter(Boolean) || [],
+        tags: data.tags?.split(',').map((s) => s.trim()).filter(Boolean) || [],
       };
 
       await createScholarship(formattedData);
       toast.success('Scholarship created successfully! 🎉');
       navigate('/scholarships');
     } catch (error: any) {
+      console.error('Error creating scholarship:', error);
       toast.error(error.message || 'Failed to create scholarship');
     } finally {
       setLoading(false);
@@ -303,7 +276,7 @@ export function CreateScholarshipPage() {
                   )}
                 />
 
-                {/* Application URL */}
+                {/* Application URL - UPDATED with better placeholder */}
                 <FormField
                   control={form.control}
                   name="applicationURL"
@@ -311,8 +284,13 @@ export function CreateScholarshipPage() {
                     <FormItem>
                       <FormLabel>Application URL</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://example.com/apply" {...field} />
+                        <Input 
+                          placeholder="https://example.com/apply (optional)" 
+                          {...field} 
+                          value={field.value || ''}
+                        />
                       </FormControl>
+                      <FormDescription>Leave empty if not available</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -333,10 +311,7 @@ export function CreateScholarshipPage() {
                     <FormItem>
                       <FormLabel>Target Fields of Study</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Computer Science, Engineering, Data Science"
-                          {...field}
-                        />
+                        <Input placeholder="Computer Science, Engineering, Data Science" {...field} />
                       </FormControl>
                       <FormDescription>Comma-separated list</FormDescription>
                       <FormMessage />

@@ -41,22 +41,14 @@ const createScholarshipSchema = z.object({
 // GET: List all scholarships (public)
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search = '',
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-    } = req.query;
+    const { page = 1, limit = 10, search = '', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
 
-    // Convert to numbers
     const pageNum = Number(page);
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause for search
     const where: any = {
-      deletedAt: null, // Don't show deleted scholarships
+      deletedAt: null,
     };
 
     if (search) {
@@ -67,19 +59,25 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
-    // Build order by
     const orderBy: any = {};
     orderBy[String(sortBy)] = String(sortOrder);
 
-    // Get total count for pagination
     const total = await prisma.scholarship.count({ where });
 
-    // Get scholarships
     const scholarships = await prisma.scholarship.findMany({
       where,
       orderBy,
       skip,
       take: limitNum,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
     });
 
     res.json({
@@ -92,6 +90,7 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    console.error('❌ Error fetching scholarships:', error);
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to fetch scholarships');
   }
 });
@@ -105,6 +104,15 @@ router.get('/:id', async (req: Request, res: Response) => {
       where: {
         id,
         deletedAt: null,
+      },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -121,6 +129,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     res.json({ data: scholarship });
   } catch (error) {
     if (error instanceof AppError) throw error;
+    console.error('❌ Error fetching scholarship:', error);
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to fetch scholarship');
   }
 });
@@ -131,15 +140,28 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     // Validate request body
     const validatedData = createScholarshipSchema.parse(req.body);
 
-    // Add user ID to track who created it
+    // Log the user info for debugging
+    console.log('👤 Creating scholarship for user:', req.user?.id || 'anonymous');
+    console.log('📧 User email:', req.user?.email);
+
+    // Use the database user ID from the authenticated user
     const data = {
       ...validatedData,
       source: 'ADMIN_CREATED',
-      createdBy: req.user?.id,
+      createdBy: req.user?.id, // This is now the database ID
     };
 
     const scholarship = await prisma.scholarship.create({
       data,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
     });
 
     res.status(201).json({
@@ -147,8 +169,9 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       data: scholarship,
     });
   } catch (error) {
+    console.error('❌ Error creating scholarship:', error);
     if (error instanceof z.ZodError) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Validation failed', error.issues);
+      throw new AppError(400, 'VALIDATION_ERROR', 'Validation failed', error.errors);
     }
     if (error instanceof AppError) throw error;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to create scholarship');

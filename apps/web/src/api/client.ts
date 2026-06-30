@@ -27,7 +27,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      console.log('Unauthorized - redirecting to login');
+      console.log('Unauthorized - please login again');
     }
     return Promise.reject(error);
   }
