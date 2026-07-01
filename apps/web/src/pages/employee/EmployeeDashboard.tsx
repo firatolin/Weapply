@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
   Award,
   Calendar,
   Shield,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEmployeeStats } from '@/api/employee';
@@ -26,13 +27,22 @@ import { toast } from 'sonner';
 
 export function EmployeeDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('my-work');
 
-  const { data: statsData, isLoading, refetch } = useQuery({
+  // Fetch employee stats with refetch interval
+  const { data: statsData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['employee-stats'],
     queryFn: getEmployeeStats,
     staleTime: 30000,
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
+
+  // Manual refresh function
+  const handleRefresh = async () => {
+    await refetch();
+    toast.success('Dashboard refreshed');
+  };
 
   if (isLoading) {
     return (
@@ -60,8 +70,12 @@ export function EmployeeDashboard() {
   }
 
   const stats = statsData?.stats;
-  const recentScholarships = statsData?.recentScholarships || [];
   const allScholarships = statsData?.allScholarships || [];
+  const recentScholarships = statsData?.recentScholarships || allScholarships.slice(0, 5);
+
+  // Count pending and verified scholarships
+  const pendingCount = allScholarships.filter((s: any) => !s.isVerified).length;
+  const verifiedCount = allScholarships.filter((s: any) => s.isVerified).length;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -75,13 +89,32 @@ export function EmployeeDashboard() {
           <p className="text-muted-foreground mt-1">
             Manage your scholarships and applications
           </p>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline" className="text-xs">
+              {user?.role}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              Last updated: {new Date().toLocaleTimeString()}
+            </span>
+          </div>
         </div>
-        <Link to="/scholarships/create">
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Scholarship
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isRefetching}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        </Link>
+          <Link to="/scholarships/create">
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              New Scholarship
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -93,9 +126,10 @@ export function EmployeeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.myScholarships || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats?.verifiedScholarships || 0} verified
-            </p>
+            <div className="flex gap-2 mt-1">
+              <span className="text-xs text-green-600">✓ {verifiedCount} verified</span>
+              <span className="text-xs text-yellow-600">⏳ {pendingCount} pending</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -106,7 +140,7 @@ export function EmployeeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.pendingReviews || 0}</div>
-            <p className="text-xs text-muted-foreground">Need attention</p>
+            <p className="text-xs text-muted-foreground">Waiting for admin verification</p>
           </CardContent>
         </Card>
 
@@ -128,7 +162,7 @@ export function EmployeeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats?.totalScholarships > 0
+              {stats?.totalScholarships && stats.totalScholarships > 0
                 ? Math.round((stats.verifiedScholarships / stats.totalScholarships) * 100)
                 : 0}%
             </div>
@@ -151,8 +185,20 @@ export function EmployeeDashboard() {
         <TabsContent value="my-work">
           <Card>
             <CardHeader>
-              <CardTitle>My Scholarships</CardTitle>
-              <CardDescription>Scholarships you've created</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>My Scholarships</CardTitle>
+                  <CardDescription>Scholarships you've created</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    {verifiedCount} Verified
+                  </Badge>
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                    {pendingCount} Pending
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {allScholarships.length > 0 ? (
@@ -160,18 +206,32 @@ export function EmployeeDashboard() {
                   {allScholarships.map((scholarship: any) => (
                     <div
                       key={scholarship.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex-1">
-                        <h3 className="font-medium">{scholarship.name}</h3>
-                        <p className="text-sm text-muted-foreground">{scholarship.provider}</p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-medium">{scholarship.name}</h3>
                           {scholarship.isVerified ? (
-                            <Badge className="bg-green-100 text-green-800">Verified</Badge>
+                            <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Verified
+                            </Badge>
                           ) : (
-                            <Badge variant="outline">Pending Verification</Badge>
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Pending
+                            </Badge>
                           )}
-                          <Badge variant="outline">Active</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{scholarship.provider}</p>
+                        <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+                          <span>Created: {new Date(scholarship.createdAt).toLocaleDateString()}</span>
+                          {scholarship.isVerified && scholarship.lastVerifiedAt && (
+                            <span className="text-green-600">
+                              Verified: {new Date(scholarship.lastVerifiedAt).toLocaleDateString()}
+                            </span>
+                          )}
+                          <span>👁️ {scholarship.viewCount || 0} views</span>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -213,6 +273,7 @@ export function EmployeeDashboard() {
               <div className="text-center py-8">
                 <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500">No applications received yet</p>
+                <p className="text-sm text-muted-foreground">Applications will appear here once students apply to your scholarships</p>
               </div>
             </CardContent>
           </Card>
@@ -223,13 +284,39 @@ export function EmployeeDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Pending Reviews</CardTitle>
-              <CardDescription>Scholarships waiting for your review</CardDescription>
+              <CardDescription>Scholarships waiting for admin verification</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">All caught up! No pending reviews</p>
-              </div>
+              {pendingCount > 0 ? (
+                <div className="space-y-4">
+                  {allScholarships
+                    .filter((s: any) => !s.isVerified)
+                    .map((scholarship: any) => (
+                      <div
+                        key={scholarship.id}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-yellow-50 border-yellow-200"
+                      >
+                        <div>
+                          <h3 className="font-medium">{scholarship.name}</h3>
+                          <p className="text-sm text-muted-foreground">{scholarship.provider}</p>
+                          <p className="text-xs text-yellow-600 mt-1">⏳ Awaiting admin verification</p>
+                        </div>
+                        <Link to={`/scholarships/${scholarship.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                          </Button>
+                        </Link>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                  <p className="text-gray-500">All caught up! No pending reviews</p>
+                  <p className="text-sm text-muted-foreground">All your scholarships have been verified</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

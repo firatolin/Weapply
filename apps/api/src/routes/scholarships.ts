@@ -4,6 +4,7 @@ import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/error.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireStaff, requireAdmin } from '../middleware/roles.js';
+
 const router: Router = Router();
 
 // Validation schema for creating a scholarship
@@ -77,6 +78,13 @@ router.get('/', async (req: Request, res: Response) => {
             email: true,
           },
         },
+        verifiedByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
       },
     });
 
@@ -95,6 +103,54 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// GET: Get pending scholarships for verification (ADMIN only)
+router.get('/pending', authMiddleware, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where = {
+      isVerified: false,
+      deletedAt: null,
+    };
+
+    const total = await prisma.scholarship.count({ where });
+
+    const scholarships = await prisma.scholarship.findMany({
+      where,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      skip,
+      take: limitNum,
+    });
+
+    res.json({
+      success: true,
+      data: scholarships,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error fetching pending scholarships:', error);
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to fetch pending scholarships');
+  }
+});
+
 // GET: Get a single scholarship by ID
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -107,6 +163,13 @@ router.get('/:id', async (req: Request, res: Response) => {
       },
       include: {
         createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+        verifiedByUser: {
           select: {
             id: true,
             displayName: true,
@@ -178,6 +241,63 @@ router.post('/', authMiddleware, requireStaff, async (req: AuthRequest, res: Res
   }
 });
 
+// PUT: Verify a scholarship (ADMIN only)
+router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { verified } = req.body;
+
+    if (verified === undefined) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Verified status is required');
+    }
+
+    // Check if scholarship exists
+    const existing = await prisma.scholarship.findFirst({
+      where: { id, deletedAt: null },
+    });
+
+    if (!existing) {
+      throw new AppError(404, 'NOT_FOUND', 'Scholarship not found');
+    }
+
+    // Update verification status
+    const scholarship = await prisma.scholarship.update({
+      where: { id },
+      data: {
+        isVerified: verified,
+        lastVerifiedAt: verified ? new Date() : null,
+        verifiedBy: verified ? req.user?.id : null,
+      },
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+        verifiedByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: verified ? 'Scholarship verified successfully' : 'Scholarship unverified',
+      data: scholarship,
+    });
+  } catch (error) {
+    console.error('❌ Error verifying scholarship:', error);
+    if (error instanceof AppError) throw error;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to verify scholarship');
+  }
+});
+
 // PUT: Update a scholarship (requires ADMIN or EMPLOYEE)
 router.put('/:id', authMiddleware, requireStaff, async (req: AuthRequest, res: Response) => {
   try {
@@ -206,6 +326,13 @@ router.put('/:id', authMiddleware, requireStaff, async (req: AuthRequest, res: R
             displayName: true,
             email: true,
             role: true,
+          },
+        },
+        verifiedByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
           },
         },
       },

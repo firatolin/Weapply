@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,29 +8,25 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Users,
-  GraduationCap,
   Award,
-  Calendar,
-  TrendingUp,
-  UserPlus,
+  Clock,
+  FileText,
   Settings,
   Shield,
-  BarChart3,
-  FileText,
-  Mail,
   Bell,
   Loader2,
   CheckCircle,
   XCircle,
-  Clock,
   Search,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser } from '@/api/admin';
+import { getScholarships as getPendingScholarships, verifyScholarship } from '@/api/scholarships';
 import { toast } from 'sonner';
 
 // Stats card component
-const StatsCard = ({ title, value, icon, description, trend }: { title: string; value: number; icon: JSX.Element; description?: string; trend?: keyof typeof trendColors }) => {
+const StatsCard = ({ title, value, icon, description, trend }: { title: string; value: number; icon: JSX.Element; description?: string; trend?: 'up' | 'down' | 'neutral' }) => {
   const trendColors = {
     up: 'text-green-600',
     down: 'text-red-600',
@@ -57,6 +53,7 @@ const StatsCard = ({ title, value, icon, description, trend }: { title: string; 
 
 export function AdminDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -73,6 +70,33 @@ export function AdminDashboard() {
     queryKey: ['admin-users', searchTerm, roleFilter],
     queryFn: () => getAdminUsers(1, 10, searchTerm, roleFilter),
     staleTime: 30000,
+  });
+
+  // Fetch pending scholarships for verification
+  const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery({
+    queryKey: ['pending-scholarships'],
+    queryFn: () => getPendingScholarships(1, 20, '', 'createdAt', 'asc'),
+    staleTime: 30000,
+    enabled: activeTab === 'scholarships',
+  });
+
+  // Filter pending scholarships (isVerified: false)
+  const pendingScholarships = pendingData?.data?.filter((s: any) => !s.isVerified) || [];
+
+  // Verify mutation
+  const verifyMutation = useMutation({
+    mutationFn: ({ id, verified }: { id: string; verified: boolean }) =>
+      verifyScholarship(id, verified),
+    onSuccess: () => {
+      toast.success('Scholarship status updated');
+      queryClient.invalidateQueries({ queryKey: ['pending-scholarships'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      refetchPending();
+      refetchStats();
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to update scholarship');
+    },
   });
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -268,7 +292,7 @@ export function AdminDashboard() {
                   <CardDescription>Manage all users on the platform</CardDescription>
                 </div>
                 <Button size="sm">
-                  <UserPlus className="h-4 w-4 mr-2" />
+                  <Users className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
               </div>
@@ -381,21 +405,88 @@ export function AdminDashboard() {
           </Card>
         </TabsContent>
 
-        {/* Scholarships Tab */}
+        {/* Scholarships Tab - Updated with Verification */}
         <TabsContent value="scholarships">
           <Card>
             <CardHeader>
-              <CardTitle>Scholarships Management</CardTitle>
-              <CardDescription>View and manage all scholarships</CardDescription>
+              <div className="flex flex-wrap justify-between items-center gap-4">
+                <div>
+                  <CardTitle>Scholarship Management</CardTitle>
+                  <CardDescription>Review and verify scholarships</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Badge className="bg-yellow-100 text-yellow-800">
+                    {pendingScholarships.length} Pending
+                  </Badge>
+                  <Link to="/scholarships">
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View All
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <Award className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">Scholarship management coming soon</p>
-                <Link to="/scholarships">
-                  <Button className="mt-4">View All Scholarships</Button>
-                </Link>
-              </div>
+              {pendingLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : pendingScholarships.length > 0 ? (
+                <div className="space-y-4">
+                  {pendingScholarships.map((scholarship: any) => (
+                    <div
+                      key={scholarship.id}
+                      className="flex flex-wrap items-center justify-between p-4 border rounded-lg hover:bg-gray-50 gap-4"
+                    >
+                      <div className="flex-1 min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium">{scholarship.name}</h3>
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                            ⏳ Pending
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{scholarship.provider}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>
+                            Created by: {scholarship.createdByUser?.displayName || scholarship.createdByUser?.email || 'Unknown'}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {new Date(scholarship.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => verifyMutation.mutate({ id: scholarship.id, verified: true })}
+                          disabled={verifyMutation.isPending}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Verify
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => verifyMutation.mutate({ id: scholarship.id, verified: false })}
+                          disabled={verifyMutation.isPending}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
+                  <p className="text-gray-500">All scholarships are verified!</p>
+                  <p className="text-sm text-muted-foreground">No pending reviews</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

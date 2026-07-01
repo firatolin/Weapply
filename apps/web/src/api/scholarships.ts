@@ -70,3 +70,14 @@ export const updateScholarship = async (id: string, data: any): Promise<Scholars
 export const deleteScholarship = async (id: string): Promise<void> => {
   await apiClient.delete(`/scholarships/${id}`);
 };
+export const getPendingScholarships = async (page = 1, limit = 10) => {
+  const response = await apiClient.get('/scholarships/pending', {
+    params: { page, limit },
+  });
+  return response.data;
+};
+
+export const verifyScholarship = async (id: string, verified: boolean) => {
+  const response = await apiClient.put(`/scholarships/${id}/verify`, { verified });
+  return response.data;
+};

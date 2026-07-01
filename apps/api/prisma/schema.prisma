@@ -23,6 +23,7 @@ model User {
   profile       Profile?
   scholarships  Scholarship[] @relation("UserScholarships")
   favorites     Favorite[]
+  verifiedScholarships Scholarship[] @relation("VerifiedScholarships")
 
   @@index([uid])
   @@index([email])
@@ -81,6 +82,8 @@ model Scholarship {
   tags              String[]
   isVerified        Boolean   @default(false)
   lastVerifiedAt    DateTime?
+  verifiedBy        String?
+  verifiedByUser    User?     @relation("VerifiedScholarships", fields: [verifiedBy], references: [id])
   source            String
   viewCount         Int       @default(0)
   matchCount        Int       @default(0)
@@ -88,7 +91,7 @@ model Scholarship {
   createdBy         String?
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
   favoritedBy       Favorite[]
-  
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
