@@ -22,6 +22,7 @@ model User {
 
   profile       Profile?
   scholarships  Scholarship[] @relation("UserScholarships")
+  favorites     Favorite[]
 
   @@index([uid])
   @@index([email])
@@ -86,6 +87,7 @@ model Scholarship {
   
   createdBy         String?
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
+  favoritedBy       Favorite[]
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -97,4 +99,18 @@ model Scholarship {
   @@index([isVerified])
   @@index([deletedAt])
   @@index([tags])
+}
+
+model Favorite {
+  id              String    @id @default(cuid())
+  userId          String
+  scholarshipId   String
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scholarship     Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scholarshipId])
+  @@index([userId])
+  @@index([scholarshipId])
 }

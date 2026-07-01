@@ -12,6 +12,7 @@ import { SignupPage } from '@/pages/SignupPage';
 import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ProfilePage } from './pages/ProfilePage';
+import { FavoritesPage } from './pages/FavoritesPage';
 
 function App() {
   return (
@@ -37,6 +38,14 @@ function App() {
                 <ProtectedRoute>
                   <ProfilePage />
                 </ProtectedRoute>
+              } 
+            />
+            <Route 
+            path="/favorites" 
+            element={
+              <ProtectedRoute>
+                <FavoritesPage />
+              </ProtectedRoute>
               } 
             />
             <Route path="/scholarships" element={<ScholarshipsPage />} />
