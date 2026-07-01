@@ -11,6 +11,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ProfilePage } from './pages/ProfilePage';
 
 function App() {
   return (
@@ -29,6 +30,14 @@ function App() {
                   <DashboardPage />
                 </ProtectedRoute>
               }
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } 
             />
             <Route path="/scholarships" element={<ScholarshipsPage />} />
             <Route path="/scholarships/:id" element={<ScholarshipDetailsPage />} />

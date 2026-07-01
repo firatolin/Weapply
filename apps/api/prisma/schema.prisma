@@ -14,6 +14,7 @@ model User {
   emailVerified Boolean   @default(false)
   displayName   String?
   photoURL      String?
+  role          String    @default("VIEWER") // "VIEWER", "EMPLOYEE", "ADMIN"
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -25,6 +26,7 @@ model User {
   @@index([uid])
   @@index([email])
   @@index([deletedAt])
+  @@index([role])
 }
 
 model Profile {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
-  User,
+  User as FirebaseUser,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -14,8 +14,14 @@ import { auth, googleProvider } from '../lib/firebase/config';
 import { toast } from 'sonner';
 import { syncUser } from '../api/auth';
 
+// Extended user type with role (for backend permissions only)
+export interface AppUser extends FirebaseUser {
+  role?: string;
+  dbId?: string;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
@@ -23,22 +29,69 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper to extend Firebase user with role from backend
+  const extendUserWithRole = async (firebaseUser: FirebaseUser): Promise<AppUser> => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const syncedUser = await syncUser(token);
+      
+      // Return extended user with role and dbId
+      return {
+        ...firebaseUser,
+        role: syncedUser.role || 'VIEWER',
+        dbId: syncedUser.id,
+      } as AppUser;
+    } catch (error) {
+      console.error('❌ Failed to get user role:', error);
+      // Return user with default role
+      return {
+        ...firebaseUser,
+        role: 'VIEWER',
+      } as AppUser;
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const extendedUser = await extendUserWithRole(firebaseUser);
+          setUser(extendedUser);
+        } catch (error) {
+          console.error('❌ Failed to extend user:', error);
+          setUser({
+            ...firebaseUser,
+            role: 'VIEWER',
+          } as AppUser);
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
+
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      try {
+        const extendedUser = await extendUserWithRole(auth.currentUser);
+        setUser(extendedUser);
+      } catch (error) {
+        console.error('❌ Failed to refresh user:', error);
+      }
+    }
+  };
 
   const login = async (email: string, password: string) => {
     try {
@@ -49,10 +102,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // 🔥 SYNC USER WITH BACKEND
+      // Sync user with backend and get role
       try {
         const token = await result.user.getIdToken();
-        await syncUser(token);
+        const syncedUser = await syncUser(token);
+        const extendedUser = {
+          ...result.user,
+          role: syncedUser.role || 'VIEWER',
+          dbId: syncedUser.id,
+        } as AppUser;
+        setUser(extendedUser);
         console.log('✅ User synced with backend');
       } catch (syncError) {
         console.error('❌ Failed to sync user:', syncError);
@@ -81,7 +140,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Sync user with backend
       try {
         const token = await result.user.getIdToken();
-        await syncUser(token);
+        const syncedUser = await syncUser(token);
+        const extendedUser = {
+          ...result.user,
+          role: syncedUser.role || 'VIEWER',
+          dbId: syncedUser.id,
+        } as AppUser;
+        setUser(extendedUser);
         console.log('✅ User synced with backend');
       } catch (syncError) {
         console.error('❌ Failed to sync user:', syncError);
@@ -106,10 +171,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await signInWithPopup(auth, googleProvider);
       console.log('✅ Google sign-in successful:', result.user.email);
 
-      // 🔥 SYNC USER WITH BACKEND
+      // Sync user with backend
       try {
         const token = await result.user.getIdToken();
-        await syncUser(token);
+        const syncedUser = await syncUser(token);
+        const extendedUser = {
+          ...result.user,
+          role: syncedUser.role || 'VIEWER',
+          dbId: syncedUser.id,
+        } as AppUser;
+        setUser(extendedUser);
         console.log('✅ User synced with backend');
       } catch (syncError) {
         console.error('❌ Failed to sync user:', syncError);
@@ -138,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setUser(null);
       toast.success('Logged out successfully');
     } catch (error) {
       toast.error('Failed to log out');
@@ -178,6 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     resetPassword,
     sendVerificationEmail,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

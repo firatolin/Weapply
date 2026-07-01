@@ -3,7 +3,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/error.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
-
+import { requireStaff, requireAdmin } from '../middleware/roles.js';
 const router: Router = Router();
 
 // Validation schema for creating a scholarship
@@ -134,21 +134,20 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST: Create a new scholarship (requires authentication)
-router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+// POST: Create a new scholarship (requires ADMIN or EMPLOYEE)
+router.post('/', authMiddleware, requireStaff, async (req: AuthRequest, res: Response) => {
   try {
     // Validate request body
     const validatedData = createScholarshipSchema.parse(req.body);
 
-    // Log the user info for debugging
-    console.log('👤 Creating scholarship for user:', req.user?.id || 'anonymous');
+    console.log('👤 Creating scholarship for user:', req.user?.id);
     console.log('📧 User email:', req.user?.email);
+    console.log('🔑 User role:', req.user?.role);
 
-    // Use the database user ID from the authenticated user
     const data = {
       ...validatedData,
       source: 'ADMIN_CREATED',
-      createdBy: req.user?.id, // This is now the database ID
+      createdBy: req.user?.id,
     };
 
     const scholarship = await prisma.scholarship.create({
@@ -159,6 +158,7 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
             id: true,
             displayName: true,
             email: true,
+            role: true,
           },
         },
       },
@@ -178,8 +178,8 @@ router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PUT: Update a scholarship (requires authentication)
-router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+// PUT: Update a scholarship (requires ADMIN or EMPLOYEE)
+router.put('/:id', authMiddleware, requireStaff, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -199,6 +199,16 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     const scholarship = await prisma.scholarship.update({
       where: { id },
       data: validatedData,
+      include: {
+        createdByUser: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
     });
 
     res.json({
@@ -207,15 +217,15 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Validation failed', error.issues);
+      throw new AppError(400, 'VALIDATION_ERROR', 'Validation failed', error.errors);
     }
     if (error instanceof AppError) throw error;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to update scholarship');
   }
 });
 
-// DELETE: Soft delete a scholarship (requires authentication)
-router.delete('/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+// DELETE: Soft delete a scholarship (requires ADMIN only)
+router.delete('/:id', authMiddleware, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 

@@ -10,7 +10,8 @@ export interface AuthRequest extends Request {
     emailVerified: boolean;
     displayName?: string;
     photoURL?: string;
-    id?: string; // Database user ID
+    id?: string;
+    role?: string; // Add role
   };
 }
 
@@ -28,9 +29,6 @@ export const authMiddleware = async (
     const token = authHeader.split(' ')[1];
     
     // Verify Firebase token
-    if (!adminAuth) {
-      throw new AppError(500, 'SERVER_ERROR', 'Firebase admin is not initialized');
-    }
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Get user info from Firebase
@@ -42,7 +40,7 @@ export const authMiddleware = async (
     });
 
     if (!dbUser) {
-      // Create user if doesn't exist (should already exist from sync)
+      // Create user with default VIEWER role
       dbUser = await prisma.user.create({
         data: {
           uid: firebaseUser.uid,
@@ -50,6 +48,7 @@ export const authMiddleware = async (
           displayName: firebaseUser.displayName || null,
           photoURL: firebaseUser.photoURL || null,
           emailVerified: firebaseUser.emailVerified || false,
+          role: 'VIEWER', // Default role
           lastLoginAt: new Date(),
         },
       });
@@ -66,14 +65,15 @@ export const authMiddleware = async (
       });
     }
 
-    // Set user in request with database ID
+    // Set user in request with database ID and role
     req.user = {
       uid: firebaseUser.uid,
       email: firebaseUser.email || '',
       emailVerified: firebaseUser.emailVerified || false,
       displayName: firebaseUser.displayName || '',
       photoURL: firebaseUser.photoURL || '',
-      id: dbUser.id, // Add the database ID
+      id: dbUser.id,
+      role: dbUser.role || 'VIEWER', // Include the role
     };
     
     next();

@@ -1,32 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getScholarships, Scholarship } from '../api/scholarships';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, ExternalLink, Calendar, DollarSign, Globe } from 'lucide-react';
+import { Search, ExternalLink, Calendar, DollarSign, Globe, Plus } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export function ScholarshipsPage() {
+  const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch scholarships from API
+  // Check if user has permission to create (ADMIN or EMPLOYEE)
+  const canCreate = user && (user.role === 'ADMIN' || user.role === 'EMPLOYEE');
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['scholarships', page, searchTerm],
     queryFn: () => getScholarships(page, 10, searchTerm),
-    staleTime: 5000, // Adjust stale time as needed
+    staleTime: 5000,
   });
 
-  // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearchTerm(search);
-    setPage(1); // Reset to first page
+    setPage(1);
   };
 
-  // Format date
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'No deadline';
     const date = new Date(dateString);
@@ -37,7 +39,6 @@ export function ScholarshipsPage() {
     });
   };
 
-  // Format currency
   const formatCurrency = (amount?: number) => {
     if (!amount) return 'Not specified';
     return `$${amount.toLocaleString()}`;
@@ -47,9 +48,14 @@ export function ScholarshipsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Scholarships</h1>
-        <Link to="/scholarships/create">
-          <Button>Add Scholarship</Button>
-        </Link>
+        {canCreate && (
+          <Link to="/scholarships/create">
+            <Button className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Scholarship
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -105,12 +111,12 @@ export function ScholarshipsPage() {
               <Card key={scholarship.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <CardTitle className="text-lg line-clamp-2">{scholarship.name}</CardTitle>
                       <CardDescription className="mt-1">{scholarship.provider}</CardDescription>
                     </div>
                     {scholarship.isVerified && (
-                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full whitespace-nowrap ml-2">
                         ✓ Verified
                       </span>
                     )}
@@ -179,6 +185,13 @@ export function ScholarshipsPage() {
                       </Button>
                     )}
                   </div>
+
+                  {/* Show creator name if available */}
+                  {(scholarship as any).createdByUser && (
+                    <div className="mt-3 pt-3 border-t text-xs text-gray-400">
+                      Created by: {(scholarship as any).createdByUser.displayName || (scholarship as any).createdByUser.email}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

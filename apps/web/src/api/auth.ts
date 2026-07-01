@@ -7,6 +7,7 @@ export interface AuthUser {
   emailVerified: boolean;
   displayName?: string;
   photoURL?: string;
+  role?: string;
   profile?: {
     id: string;
     firstName?: string;
