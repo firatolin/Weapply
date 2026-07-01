@@ -47,7 +47,7 @@ export function ScholarshipsPage() {
     mutationFn: addFavorite,
     onSuccess: (data) => {
       setFavorites((prev) => new Set([...prev, data.id]));
-      toast.success('Added to favorites ❤️');
+      toast.success('Added to favorites');
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
     },
     onError: (error: any) => {

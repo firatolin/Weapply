@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, LogOut, Settings } from 'lucide-react';
+import { User, LogOut, Settings, Shield, Briefcase, LayoutDashboard } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,19 @@ export function Header() {
       .slice(0, 2);
   };
 
+  // Determine which dashboard link to show based on role
+  const getDashboardLink = () => {
+    if (!user) return '/dashboard';
+    switch (user.role) {
+      case 'ADMIN':
+        return '/admin';
+      case 'EMPLOYEE':
+        return '/employee';
+      default:
+        return '/dashboard';
+    }
+  };
+
   return (
     <header className="border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -35,8 +48,13 @@ export function Header() {
             Scholarships
           </Link>
           {user && (
-            <Link to="/dashboard" className="text-sm hover:text-primary">
+            <Link to={getDashboardLink()} className="text-sm hover:text-primary">
               Dashboard
+            </Link>
+          )}
+          {user && user.role === 'ADMIN' && (
+            <Link to="/admin" className="text-sm hover:text-primary">
+              Admin
             </Link>
           )}
           {user ? (
@@ -60,15 +78,42 @@ export function Header() {
                     <p className="text-xs leading-none text-muted-foreground">
                       {user.email}
                     </p>
+                    {user.role && (
+                      <p className="text-xs leading-none text-muted-foreground">
+                        Role: {user.role}
+                      </p>
+                    )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to={getDashboardLink()} className="cursor-pointer flex items-center">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    <span>Dashboard</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/profile" className="cursor-pointer flex items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
+                {user.role === 'ADMIN' && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/admin" className="cursor-pointer flex items-center">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>Admin Panel</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {user.role === 'EMPLOYEE' && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/employee" className="cursor-pointer flex items-center">
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      <span>Employee Panel</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem asChild>
                   <Link to="/settings" className="cursor-pointer flex items-center">
                     <Settings className="mr-2 h-4 w-4" />

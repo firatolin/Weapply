@@ -13,6 +13,8 @@ import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ProfilePage } from './pages/ProfilePage';
 import { FavoritesPage } from './pages/FavoritesPage';
+import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 
 function App() {
   return (
@@ -47,6 +49,22 @@ function App() {
                 <FavoritesPage />
               </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee"
+              element={
+                <ProtectedRoute>
+                  <EmployeeDashboard />
+                </ProtectedRoute>
+              }
             />
             <Route path="/scholarships" element={<ScholarshipsPage />} />
             <Route path="/scholarships/:id" element={<ScholarshipDetailsPage />} />

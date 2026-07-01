@@ -60,7 +60,7 @@ export function FavoritesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center gap-3 mb-6">
-        <Heart className="h-8 w-8 text-red-500 fill-red-500" />
+        {/* <Heart className="h-8 w-8 text-red-500 fill-red-500" /> */}
         <h1 className="text-3xl font-bold">My Favorites</h1>
         <span className="text-sm text-muted-foreground">({favorites?.length || 0} scholarships)</span>
       </div>
