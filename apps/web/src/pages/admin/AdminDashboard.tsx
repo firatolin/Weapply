@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Users,
   GraduationCap,
@@ -22,20 +23,14 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  Search,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getScholarships } from '@/api/scholarships';
+import { getAdminStats, getAdminUsers, updateUserRole, deleteUser } from '@/api/admin';
+import { toast } from 'sonner';
 
-// Admin stats card
-interface StatsCardProps {
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  description?: string;
-  trend?: 'up' | 'down' | 'neutral';
-}
-
-const StatsCard = ({ title, value, icon, description, trend }: StatsCardProps) => {
+// Stats card component
+const StatsCard = ({ title, value, icon, description, trend }: { title: string; value: number; icon: JSX.Element; description?: string; trend?: keyof typeof trendColors }) => {
   const trendColors = {
     up: 'text-green-600',
     down: 'text-red-600',
@@ -63,25 +58,48 @@ const StatsCard = ({ title, value, icon, description, trend }: StatsCardProps) =
 export function AdminDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
 
-  // Fetch scholarships for stats
-  const { data: scholarshipsData, isLoading: scholarshipsLoading } = useQuery({
-    queryKey: ['admin-scholarships'],
-    queryFn: () => getScholarships(1, 100),
+  // Fetch admin stats
+  const { data: statsData, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ['admin-stats'],
+    queryFn: getAdminStats,
     staleTime: 60000,
   });
 
-  // Mock stats (in production, fetch from API)
-  const stats = {
-    totalUsers: 156,
-    activeUsers: 89,
-    totalScholarships: scholarshipsData?.data?.length || 0,
-    totalApplications: 234,
-    pendingReviews: 12,
-    verifiedScholarships: scholarshipsData?.data?.filter((s: any) => s.isVerified).length || 0,
+  // Fetch users
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['admin-users', searchTerm, roleFilter],
+    queryFn: () => getAdminUsers(1, 10, searchTerm, roleFilter),
+    staleTime: 30000,
+  });
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      await updateUserRole(userId, newRole);
+      toast.success('User role updated successfully');
+      refetchUsers();
+      refetchStats();
+    } catch (error) {
+      toast.error('Failed to update user role');
+    }
   };
 
-  if (scholarshipsLoading) {
+  const handleDeleteUser = async (userId: string) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        await deleteUser(userId);
+        toast.success('User deleted successfully');
+        refetchUsers();
+        refetchStats();
+      } catch (error) {
+        toast.error('Failed to delete user');
+      }
+    }
+  };
+
+  if (statsLoading || usersLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -89,7 +107,6 @@ export function AdminDashboard() {
     );
   }
 
-  // Check if user is ADMIN
   if (user?.role !== 'ADMIN') {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -106,6 +123,10 @@ export function AdminDashboard() {
       </div>
     );
   }
+
+  const stats = statsData?.stats;
+  const recentUsers = statsData?.recentUsers || [];
+  const recentScholarships = statsData?.recentScholarships || [];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -136,31 +157,31 @@ export function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         <StatsCard
           title="Total Users"
-          value={stats.totalUsers}
+          value={stats?.totalUsers || 0}
           icon={<Users className="h-4 w-4" />}
-          description="+12% from last month"
+          description={`${stats?.activeUsers || 0} active users`}
           trend="up"
         />
         <StatsCard
-          title="Active Users"
-          value={stats.activeUsers}
-          icon={<UserPlus className="h-4 w-4" />}
-          description="57% of total users"
+          title="Total Scholarships"
+          value={stats?.totalScholarships || 0}
+          icon={<Award className="h-4 w-4" />}
+          description={`${stats?.verifiedScholarships || 0} verified`}
+          trend="up"
+        />
+        <StatsCard
+          title="Pending Reviews"
+          value={stats?.pendingScholarships || 0}
+          icon={<Clock className="h-4 w-4" />}
+          description="Waiting for verification"
           trend="neutral"
         />
         <StatsCard
-          title="Scholarships"
-          value={stats.totalScholarships}
-          icon={<Award className="h-4 w-4" />}
-          description={`${stats.verifiedScholarships} verified`}
-          trend="up"
-        />
-        <StatsCard
-          title="Applications"
-          value={stats.totalApplications}
+          title="Total Favorites"
+          value={stats?.totalFavorites || 0}
           icon={<FileText className="h-4 w-4" />}
-          description={`${stats.pendingReviews} pending review`}
-          trend="down"
+          description="Saved by users"
+          trend="up"
         />
       </div>
 
@@ -170,64 +191,68 @@ export function AdminDashboard() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="scholarships">Scholarships</TabsTrigger>
-          <TabsTrigger value="applications">Applications</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Recent Activity */}
+            {/* Recent Users */}
             <Card>
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest actions on the platform</CardDescription>
+                <CardTitle>Recent Users</CardTitle>
+                <CardDescription>Latest registered users</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[1, 2, 3, 4].map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 border-b pb-3 last:border-0 last:pb-0">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <UserPlus className="h-4 w-4 text-blue-600" />
+                  {recentUsers.length > 0 ? (
+                    recentUsers.map((u: any) => (
+                      <div key={u.id} className="flex items-center gap-3 border-b pb-3 last:border-0 last:pb-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{u.displayName || u.email}</p>
+                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                        </div>
+                        <Badge variant="outline">{u.role}</Badge>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm">New user registered</p>
-                        <p className="text-xs text-muted-foreground">2 minutes ago</p>
-                      </div>
-                      <Badge variant="outline">User</Badge>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent users</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
+            {/* Recent Scholarships */}
             <Card>
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Common administrative tasks</CardDescription>
+                <CardTitle>Recent Scholarships</CardTitle>
+                <CardDescription>Latest added scholarships</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <Button className="w-full justify-start" variant="outline">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add New User
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Award className="h-4 w-4 mr-2" />
-                  Create Scholarship
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <GraduationCap className="h-4 w-4 mr-2" />
-                  Review Applications
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Announcement
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Reports
-                </Button>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentScholarships.length > 0 ? (
+                    recentScholarships.map((s: any) => (
+                      <div key={s.id} className="flex items-center gap-3 border-b pb-3 last:border-0 last:pb-0">
+                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <Award className="h-4 w-4 text-green-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{s.name}</p>
+                          <p className="text-xs text-muted-foreground">{s.provider}</p>
+                        </div>
+                        {s.isVerified ? (
+                          <Badge className="bg-green-100 text-green-800">Verified</Badge>
+                        ) : (
+                          <Badge variant="outline">Pending</Badge>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent scholarships</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -237,7 +262,7 @@ export function AdminDashboard() {
         <TabsContent value="users">
           <Card>
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
                   <CardTitle>User Management</CardTitle>
                   <CardDescription>Manage all users on the platform</CardDescription>
@@ -249,11 +274,38 @@ export function AdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 mb-4">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <select
+                  className="border rounded-md px-3 py-2 text-sm"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  <option value="">All Roles</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="EMPLOYEE">Employee</option>
+                  <option value="VIEWER">Viewer</option>
+                </select>
+                <Button variant="outline" onClick={() => { setSearchTerm(''); setRoleFilter(''); }}>
+                  Clear Filters
+                </Button>
+              </div>
+
+              {/* Users Table */}
+              <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-gray-50">
-                      <th className="p-3 text-left">Name</th>
+                      <th className="p-3 text-left">User</th>
                       <th className="p-3 text-left">Email</th>
                       <th className="p-3 text-left">Role</th>
                       <th className="p-3 text-left">Status</th>
@@ -261,23 +313,88 @@ export function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[1, 2, 3, 4, 5].map((_, i) => (
-                      <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
-                        <td className="p-3">John Doe</td>
-                        <td className="p-3">john@example.com</td>
-                        <td className="p-3">
-                          <Badge variant="outline">VIEWER</Badge>
-                        </td>
-                        <td className="p-3">
-                          <Badge className="bg-green-100 text-green-800">Active</Badge>
-                        </td>
-                        <td className="p-3">
-                          <Button variant="ghost" size="sm">Edit</Button>
+                    {usersData?.data?.length > 0 ? (
+                      usersData.data.map((u: any) => (
+                        <tr key={u.id} className="border-b last:border-0 hover:bg-gray-50">
+                          <td className="p-3 font-medium">{u.displayName || u.profile?.firstName || 'User'}</td>
+                          <td className="p-3">{u.email}</td>
+                          <td className="p-3">
+                            <select
+                              className="border rounded px-2 py-1 text-xs"
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                              disabled={u.id === user?.dbId}
+                            >
+                              <option value="VIEWER">Viewer</option>
+                              <option value="EMPLOYEE">Employee</option>
+                              <option value="ADMIN">Admin</option>
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            {u.emailVerified ? (
+                              <Badge className="bg-green-100 text-green-800">Verified</Badge>
+                            ) : (
+                              <Badge variant="outline">Unverified</Badge>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-800"
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={u.id === user?.dbId}
+                            >
+                              Delete
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-muted-foreground">
+                          No users found
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination */}
+              {usersData?.pagination && usersData.pagination.totalPages > 1 && (
+                <div className="flex justify-between items-center mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {usersData.data?.length || 0} of {usersData.pagination.total} users
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Scholarships Tab */}
+        <TabsContent value="scholarships">
+          <Card>
+            <CardHeader>
+              <CardTitle>Scholarships Management</CardTitle>
+              <CardDescription>View and manage all scholarships</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Award className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">Scholarship management coming soon</p>
+                <Link to="/scholarships">
+                  <Button className="mt-4">View All Scholarships</Button>
+                </Link>
               </div>
             </CardContent>
           </Card>

@@ -21,22 +21,18 @@ import {
   Shield,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getScholarships } from '@/api/scholarships';
+import { getEmployeeStats } from '@/api/employee';
+import { toast } from 'sonner';
 
 export function EmployeeDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('my-work');
 
-  const { data: scholarshipsData, isLoading } = useQuery({
-    queryKey: ['employee-scholarships'],
-    queryFn: () => getScholarships(1, 100),
-    staleTime: 60000,
+  const { data: statsData, isLoading, refetch } = useQuery({
+    queryKey: ['employee-stats'],
+    queryFn: getEmployeeStats,
+    staleTime: 30000,
   });
-
-  // Filter scholarships created by this employee (in production, use API filtering)
-  const myScholarships = scholarshipsData?.data?.filter(
-    (s: any) => s.createdBy === user?.uid
-  ) || [];
 
   if (isLoading) {
     return (
@@ -46,7 +42,6 @@ export function EmployeeDashboard() {
     );
   }
 
-  // Check if user is ADMIN or EMPLOYEE
   if (user?.role !== 'EMPLOYEE' && user?.role !== 'ADMIN') {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -63,6 +58,10 @@ export function EmployeeDashboard() {
       </div>
     );
   }
+
+  const stats = statsData?.stats;
+  const recentScholarships = statsData?.recentScholarships || [];
+  const allScholarships = statsData?.allScholarships || [];
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -93,8 +92,10 @@ export function EmployeeDashboard() {
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{myScholarships.length}</div>
-            <p className="text-xs text-muted-foreground">Total created</p>
+            <div className="text-2xl font-bold">{stats?.myScholarships || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.verifiedScholarships || 0} verified
+            </p>
           </CardContent>
         </Card>
 
@@ -104,7 +105,7 @@ export function EmployeeDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{stats?.pendingReviews || 0}</div>
             <p className="text-xs text-muted-foreground">Need attention</p>
           </CardContent>
         </Card>
@@ -115,7 +116,7 @@ export function EmployeeDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{stats?.applications || 0}</div>
             <p className="text-xs text-muted-foreground">Total received</p>
           </CardContent>
         </Card>
@@ -126,8 +127,14 @@ export function EmployeeDashboard() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">84%</div>
-            <p className="text-xs text-muted-foreground">+5% from last month</p>
+            <div className="text-2xl font-bold">
+              {stats?.totalScholarships > 0
+                ? Math.round((stats.verifiedScholarships / stats.totalScholarships) * 100)
+                : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {stats?.verifiedScholarships || 0} of {stats?.totalScholarships || 0} verified
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -148,9 +155,9 @@ export function EmployeeDashboard() {
               <CardDescription>Scholarships you've created</CardDescription>
             </CardHeader>
             <CardContent>
-              {myScholarships.length > 0 ? (
+              {allScholarships.length > 0 ? (
                 <div className="space-y-4">
-                  {myScholarships.map((scholarship: any) => (
+                  {allScholarships.map((scholarship: any) => (
                     <div
                       key={scholarship.id}
                       className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
@@ -164,7 +171,7 @@ export function EmployeeDashboard() {
                           ) : (
                             <Badge variant="outline">Pending Verification</Badge>
                           )}
-                          <Badge variant="outline">{scholarship.status || 'Active'}</Badge>
+                          <Badge variant="outline">Active</Badge>
                         </div>
                       </div>
                       <div className="flex gap-2">

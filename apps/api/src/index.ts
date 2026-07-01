@@ -10,6 +10,7 @@ import { healthRouter } from './routes/health.js';
 import { scholarshipRouter } from './routes/scholarships.js';
 import { authRouter } from './routes/auth.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
+import { employeeRouter } from './routes/employee.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
 
 const app: express.Application = express();
@@ -74,6 +75,7 @@ app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/scholarships', scholarshipRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/employee', employeeRouter);
 app.use('/api/v1/favorites', favoritesRouter);
 
 // 404 handler for undefined routes
