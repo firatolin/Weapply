@@ -42,13 +42,15 @@ interface Match {
     applicationURL?: string;
   };
   score: number;
+  reasoning: string;
   breakdown: {
     fieldMatch: number;
     educationMatch: number;
     countryMatch: number;
     financialFit: number;
   };
-  reasons: string[];
+  suggestions: string[];
+  reasons?: string[];
 }
 
 export function MatchesPage() {
@@ -60,16 +62,22 @@ export function MatchesPage() {
   const { data: matchesData, isLoading, error, refetch } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
+      console.log('🔄 Fetching matches...');
       const response = await apiClient.get('/matches/me');
+      console.log('📊 Matches response:', response.data);
       return response.data;
     },
     enabled: !!user,
-    retry: false,
+    retry: 1,
   });
 
-  const matches = matchesData?.data || [];
+  // Safe data extraction with defaults
+  const matches: Match[] = matchesData?.data || [];
   const needsProfile = matchesData?.needsProfile || false;
   const averageScore = matchesData?.averageScore || 0;
+  const totalMatches = matchesData?.total || 0;
+
+  console.log('📊 Matches data:', { matches, needsProfile, averageScore, totalMatches });
 
   // Filter matches by score
   const filteredMatches = filterScore > 0 
@@ -117,6 +125,7 @@ export function MatchesPage() {
     return `$${amount.toLocaleString()}`;
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-4">
@@ -126,7 +135,9 @@ export function MatchesPage() {
     );
   }
 
+  // Error state
   if (error) {
+    console.error('❌ Error fetching matches:', error);
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <p className="text-red-500">Failed to load matches</p>
@@ -135,6 +146,7 @@ export function MatchesPage() {
     );
   }
 
+  // Needs profile
   if (needsProfile) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
@@ -156,6 +168,7 @@ export function MatchesPage() {
     );
   }
 
+  // No matches
   if (matches.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
@@ -195,7 +208,7 @@ export function MatchesPage() {
             Your Matches
           </h1>
           <p className="text-muted-foreground">
-            {matches.length} scholarships matched to your profile • 
+            {totalMatches} scholarships matched • 
             Average match score: <span className="font-semibold">{Math.round(averageScore)}%</span>
           </p>
         </div>
@@ -376,7 +389,7 @@ export function MatchesPage() {
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Why this matches you:</p>
                       <div className="flex flex-wrap gap-2">
-                        {match.reasons.map((reason, index) => (
+                        {match.reasons?.map((reason, index) => (
                           <span key={index} className="text-xs bg-white px-2 py-1 rounded-full border">
                             {reason}
                           </span>
