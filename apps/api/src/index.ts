@@ -12,6 +12,8 @@ import { authRouter } from './routes/auth.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { employeeRouter } from './routes/employee.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
+import { matchingRouter } from './routes/matching.routes.js';
+import { userRouter } from './routes/users.routes.js';
 
 const app: express.Application = express();
 const port = config.PORT;
@@ -77,6 +79,8 @@ app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/employee', employeeRouter);
 app.use('/api/v1/favorites', favoritesRouter);
+app.use('/api/v1/matches', matchingRouter);
+app.use('/api/v1/users', userRouter);
 
 // 404 handler for undefined routes
 app.use((req: Request, res: Response) => {

@@ -39,11 +39,30 @@ model Profile {
   dateOfBirth       DateTime?
   nationality       String?
   countryOfResidence String?
-  educationLevel    String?
+  
+  // Existing academic fields (keep these)
+  educationLevel    String?   // HIGH_SCHOOL, BACHELORS, MASTERS, PHD
   gpa               Float?
-  fieldsOfInterest  String[]
-  targetCountries   String[]
-  budgetRange       Json?
+  fieldsOfInterest  String[]  // KEEP THIS - existing field
+  targetCountries   String[]  // KEEP THIS - existing field
+  budgetRange       Json?     // KEEP THIS - existing field
+  
+  // NEW fields for matching (add these)
+  fieldOfStudy      String?   // NEW - primary field of study
+  targetFields      String[]  // NEW - target fields for matching
+  scholarshipTypes  String[]  // NEW - FULL, PARTIAL, MERIT_BASED
+  
+  // Personal
+  skills            String[]  // NEW
+  languages         String[]
+  achievements      String[]
+  volunteerWork     Json?     // [{ organization, role, hours }]
+  
+  // Career Goals
+  careerGoal        String?
+  interests         String[]
+  researchAreas     String[]
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

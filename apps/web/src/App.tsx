@@ -15,6 +15,9 @@ import { ProfilePage } from './pages/ProfilePage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
+import { ProfileEditPage } from './pages/ProfileEditPage';
+import { MatchesPage } from './pages/MatchesPage';
+import { MatchDetailsPage } from './pages/MatchDetailsPage';
 
 function App() {
   return (
@@ -41,6 +44,30 @@ function App() {
                   <ProfilePage />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/profile/edit"
+              element={
+                <ProtectedRoute>
+                  <ProfileEditPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/matches"
+              element={
+                <ProtectedRoute>
+                  <MatchesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/matches/:id"
+              element={
+                <ProtectedRoute>
+                  <MatchDetailsPage />
+                </ProtectedRoute>
+              }
             />
             <Route 
             path="/favorites" 

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { User, LogOut, Settings, Shield, Briefcase, LayoutDashboard } from 'lucide-react';
+import { User, LogOut, Settings, Shield, Briefcase, LayoutDashboard, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +47,12 @@ export function Header() {
           <Link to="/scholarships" className="text-sm hover:text-primary">
             Scholarships
           </Link>
+          {user && (
+            <Link to="/matches" className="text-sm hover:text-primary flex items-center gap-1">
+              <Sparkles className="h-4 w-4" />
+              Matches
+            </Link>
+          )}
           {user && (
             <Link to={getDashboardLink()} className="text-sm hover:text-primary">
               Dashboard
@@ -96,6 +102,12 @@ export function Header() {
                   <Link to="/profile" className="cursor-pointer flex items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/profile/edit" className="cursor-pointer flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Edit Profile</span>
                   </Link>
                 </DropdownMenuItem>
                 {user.role === 'ADMIN' && (
