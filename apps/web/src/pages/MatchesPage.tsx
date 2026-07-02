@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Loader2, 
@@ -19,7 +18,12 @@ import {
   Clock,
   ChevronRight,
   Filter,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Lightbulb,
+  Target,
+  Globe,
+  BookOpen,
+  PiggyBank
 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/api/client';
@@ -50,7 +54,6 @@ interface Match {
     financialFit: number;
   };
   suggestions: string[];
-  reasons?: string[];
 }
 
 export function MatchesPage() {
@@ -62,32 +65,26 @@ export function MatchesPage() {
   const { data: matchesData, isLoading, error, refetch } = useQuery({
     queryKey: ['matches'],
     queryFn: async () => {
-      console.log('🔄 Fetching matches...');
       const response = await apiClient.get('/matches/me');
-      console.log('📊 Matches response:', response.data);
       return response.data;
     },
     enabled: !!user,
     retry: 1,
   });
 
-  // Safe data extraction with defaults
+  // Safe data extraction
   const matches: Match[] = matchesData?.data || [];
   const needsProfile = matchesData?.needsProfile || false;
   const averageScore = matchesData?.averageScore || 0;
-  const totalMatches = matchesData?.total || 0;
-
-  console.log('📊 Matches data:', { matches, needsProfile, averageScore, totalMatches });
+  const totalMatches = matchesData?.totalMatches || 0;
 
   // Filter matches by score
   const filteredMatches = filterScore > 0 
     ? matches.filter((m: Match) => m.score >= filterScore)
     : matches;
 
-  // Sort matches by score (highest first)
   const sortedMatches = [...filteredMatches].sort((a, b) => b.score - a.score);
 
-  // Get top matches (score >= 70%)
   const topMatches = sortedMatches.filter((m: Match) => m.score >= 70);
   const goodMatches = sortedMatches.filter((m: Match) => m.score >= 50 && m.score < 70);
   const otherMatches = sortedMatches.filter((m: Match) => m.score < 50);
@@ -125,7 +122,6 @@ export function MatchesPage() {
     return `$${amount.toLocaleString()}`;
   };
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-4">
@@ -135,9 +131,7 @@ export function MatchesPage() {
     );
   }
 
-  // Error state
   if (error) {
-    console.error('❌ Error fetching matches:', error);
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <p className="text-red-500">Failed to load matches</p>
@@ -146,7 +140,6 @@ export function MatchesPage() {
     );
   }
 
-  // Needs profile
   if (needsProfile) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
@@ -155,8 +148,7 @@ export function MatchesPage() {
         </div>
         <h1 className="text-2xl font-bold mb-2">Complete Your Profile First</h1>
         <p className="text-muted-foreground mb-6">
-          We need to know more about you to find the best scholarship matches. 
-          Fill in your profile to get personalized recommendations.
+          We need to know more about you to find the best scholarship matches.
         </p>
         <Link to="/profile/edit">
           <Button className="flex items-center gap-2">
@@ -168,7 +160,6 @@ export function MatchesPage() {
     );
   }
 
-  // No matches
   if (matches.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-2xl text-center">
@@ -177,21 +168,14 @@ export function MatchesPage() {
         </div>
         <h1 className="text-2xl font-bold mb-2">No Matches Found</h1>
         <p className="text-muted-foreground mb-6">
-          We couldn't find any scholarships that match your profile right now. 
-          Try updating your profile or check back later for new opportunities.
+          We couldn't find any scholarships that match your profile right now.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/profile/edit">
-            <Button variant="outline" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Update Profile
-            </Button>
+            <Button variant="outline">Update Profile</Button>
           </Link>
           <Link to="/scholarships">
-            <Button className="flex items-center gap-2">
-              <Award className="h-4 w-4" />
-              Browse All Scholarships
-            </Button>
+            <Button>Browse All Scholarships</Button>
           </Link>
         </div>
       </div>
@@ -299,11 +283,7 @@ export function MatchesPage() {
                 ))}
               </div>
               {filterScore > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFilterScore(0)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setFilterScore(0)}>
                   Clear
                 </Button>
               )}
@@ -385,16 +365,47 @@ export function MatchesPage() {
                       </div>
                     </div>
 
-                    {/* Match Breakdown */}
+                    {/* AI Match Breakdown - UPDATED */}
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Why this matches you:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {match.reasons?.map((reason, index) => (
-                          <span key={index} className="text-xs bg-white px-2 py-1 rounded-full border">
-                            {reason}
+                      <p className="text-xs font-medium text-muted-foreground mb-2">🤖 Why this matches you:</p>
+                      
+                      {/* AI Reasoning */}
+                      {match.reasoning && (
+                        <p className="text-sm text-gray-700 mb-2">{match.reasoning}</p>
+                      )}
+                      
+                      {/* Breakdown Scores */}
+                      {match.breakdown && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                            🎓 Field: {match.breakdown.fieldMatch}%
                           </span>
-                        ))}
-                      </div>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            📚 Education: {match.breakdown.educationMatch}%
+                          </span>
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                            🌍 Country: {match.breakdown.countryMatch}%
+                          </span>
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                            💰 Financial: {match.breakdown.financialFit}%
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* AI Suggestions */}
+                      {match.suggestions && match.suggestions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <p className="text-xs font-medium text-blue-600 flex items-center gap-1">
+                            <Lightbulb className="h-3 w-3" />
+                            Suggestions to improve your match:
+                          </p>
+                          <ul className="text-xs text-gray-600 list-disc list-inside mt-1">
+                            {match.suggestions.map((suggestion: string, idx: number) => (
+                              <li key={idx}>{suggestion}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Buttons */}
