@@ -13,36 +13,61 @@ const createScholarshipSchema = z.object({
   description: z.string().optional(),
   provider: z.string().min(1, 'Provider is required'),
   providerType: z.enum(['UNIVERSITY', 'GOVERNMENT', 'PRIVATE', 'NGO', 'OTHER']),
+  scholarshipType: z.enum(['FULL', 'PARTIAL', 'MERIT_BASED', 'NEED_BASED', 'RESEARCH', 'DIVERSITY']),
+  
+  // Location fields
+  country: z.string().optional(),
+  continent: z.string().optional(),
+  universityCountry: z.string().optional(),
+  
   eligibilityRules: z.any().optional(),
   targetFields: z.array(z.string()).optional(),
   targetNationalities: z.array(z.string()).optional(),
   targetCountries: z.array(z.string()).optional(),
   educationLevels: z.array(z.string()).optional(),
+  
   amountMin: z.number().optional(),
   amountMax: z.number().optional(),
   amountCurrency: z.string().default('USD'),
-  scholarshipType: z.enum([
-    'FULL',
-    'PARTIAL',
-    'MERIT_BASED',
-    'NEED_BASED',
-    'RESEARCH',
-    'DIVERSITY',
-  ]),
+  
   applicationDeadline: z.string().datetime().optional(),
   decisionDate: z.string().datetime().optional(),
   notificationDate: z.string().datetime().optional(),
+  
   applicationURL: z.string().url().optional(),
   applicationFee: z.number().optional(),
   requiredDocuments: z.array(z.string()).optional(),
   essayPrompt: z.string().optional(),
+  
+  // NEW: Requirements field
+  requirements: z.any().optional(),
+  
   tags: z.array(z.string()).optional(),
 });
 
-// GET: List all scholarships (public)
+// GET: List all scholarships with advanced filters
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, search = '', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      // Filters
+      country,
+      continent,
+      universityCountry,
+      scholarshipType,
+      minAmount,
+      maxAmount,
+      field,
+      englishProficiency,
+      minGpa,
+      minWorkExperience,
+      educationLevel,
+      recentlyPosted,
+    } = req.query;
 
     const pageNum = Number(page);
     const limitNum = Number(limit);
@@ -52,6 +77,7 @@ router.get('/', async (req: Request, res: Response) => {
       deletedAt: null,
     };
 
+    // Search
     if (search) {
       where.OR = [
         { name: { contains: String(search), mode: 'insensitive' } },
@@ -60,6 +86,57 @@ router.get('/', async (req: Request, res: Response) => {
       ];
     }
 
+    // Country filter
+    if (country) {
+      const countries = Array.isArray(country) ? country : [country];
+      where.country = { in: countries };
+    }
+
+    // Continent filter
+    if (continent) {
+      const continents = Array.isArray(continent) ? continent : [continent];
+      where.continent = { in: continents };
+    }
+
+    // University Country filter
+    if (universityCountry) {
+      const uniCountries = Array.isArray(universityCountry) ? universityCountry : [universityCountry];
+      where.universityCountry = { in: uniCountries };
+    }
+
+    // Scholarship Type filter
+    if (scholarshipType) {
+      const types = Array.isArray(scholarshipType) ? scholarshipType : [scholarshipType];
+      where.scholarshipType = { in: types };
+    }
+
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      where.amountMin = {};
+      if (minAmount) where.amountMin.gte = Number(minAmount);
+      if (maxAmount) where.amountMin.lte = Number(maxAmount);
+    }
+
+    // Field filter
+    if (field) {
+      const fields = Array.isArray(field) ? field : [field];
+      where.targetFields = { hasSome: fields };
+    }
+
+    // Education Level filter
+    if (educationLevel) {
+      const levels = Array.isArray(educationLevel) ? educationLevel : [educationLevel];
+      where.educationLevels = { hasSome: levels };
+    }
+
+    // Recently Posted filter
+    if (recentlyPosted === 'true') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      where.createdAt = { gte: thirtyDaysAgo };
+    }
+
+    // Build order by
     const orderBy: any = {};
     orderBy[String(sortBy)] = String(sortOrder);
 
@@ -89,6 +166,7 @@ router.get('/', async (req: Request, res: Response) => {
     });
 
     res.json({
+      success: true,
       data: scholarships,
       pagination: {
         page: pageNum,
@@ -200,7 +278,6 @@ router.get('/:id', async (req: Request, res: Response) => {
 // POST: Create a new scholarship (requires ADMIN or EMPLOYEE)
 router.post('/', authMiddleware, requireStaff, async (req: AuthRequest, res: Response) => {
   try {
-    // Validate request body
     const validatedData = createScholarshipSchema.parse(req.body);
 
     console.log('👤 Creating scholarship for user:', req.user?.id);
@@ -251,7 +328,6 @@ router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest,
       throw new AppError(400, 'VALIDATION_ERROR', 'Verified status is required');
     }
 
-    // Check if scholarship exists
     const existing = await prisma.scholarship.findFirst({
       where: { id, deletedAt: null },
     });
@@ -260,7 +336,6 @@ router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest,
       throw new AppError(404, 'NOT_FOUND', 'Scholarship not found');
     }
 
-    // Update verification status
     const scholarship = await prisma.scholarship.update({
       where: { id },
       data: {
@@ -303,7 +378,6 @@ router.put('/:id', authMiddleware, requireStaff, async (req: AuthRequest, res: R
   try {
     const { id } = req.params;
 
-    // Check if scholarship exists
     const existing = await prisma.scholarship.findFirst({
       where: { id, deletedAt: null },
     });
@@ -312,10 +386,8 @@ router.put('/:id', authMiddleware, requireStaff, async (req: AuthRequest, res: R
       throw new AppError(404, 'NOT_FOUND', 'Scholarship not found');
     }
 
-    // Validate request body
     const validatedData = createScholarshipSchema.parse(req.body);
 
-    // Update scholarship
     const scholarship = await prisma.scholarship.update({
       where: { id },
       data: validatedData,
@@ -356,7 +428,6 @@ router.delete('/:id', authMiddleware, requireAdmin, async (req: AuthRequest, res
   try {
     const { id } = req.params;
 
-    // Check if scholarship exists
     const existing = await prisma.scholarship.findFirst({
       where: { id, deletedAt: null },
     });
@@ -365,7 +436,6 @@ router.delete('/:id', authMiddleware, requireAdmin, async (req: AuthRequest, res
       throw new AppError(404, 'NOT_FOUND', 'Scholarship not found');
     }
 
-    // Soft delete by setting deletedAt
     await prisma.scholarship.update({
       where: { id },
       data: { deletedAt: new Date() },

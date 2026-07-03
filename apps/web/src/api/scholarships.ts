@@ -21,6 +21,11 @@ export interface Scholarship {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
+  // NEW fields
+  country?: string;
+  continent?: string;
+  universityCountry?: string;
+  requirements?: any;
 }
 
 export interface ScholarshipResponse {
@@ -33,22 +38,9 @@ export interface ScholarshipResponse {
   };
 }
 
-export const getScholarships = async (
-  page = 1,
-  limit = 10,
-  search = '',
-  sortBy = 'createdAt',
-  sortOrder = 'desc'
-): Promise<ScholarshipResponse> => {
-  const response = await apiClient.get('/scholarships', {
-    params: {
-      page,
-      limit,
-      search,
-      sortBy,
-      sortOrder,
-    },
-  });
+export const getScholarships = async (params?: string): Promise<ScholarshipResponse> => {
+  const url = params ? `/scholarships?${params}` : '/scholarships';
+  const response = await apiClient.get(url);
   return response.data;
 };
 
@@ -70,6 +62,7 @@ export const updateScholarship = async (id: string, data: any): Promise<Scholars
 export const deleteScholarship = async (id: string): Promise<void> => {
   await apiClient.delete(`/scholarships/${id}`);
 };
+
 export const getPendingScholarships = async (page = 1, limit = 10) => {
   const response = await apiClient.get('/scholarships/pending', {
     params: { page, limit },

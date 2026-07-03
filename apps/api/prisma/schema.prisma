@@ -40,25 +40,21 @@ model Profile {
   nationality       String?
   countryOfResidence String?
   
-  // Existing academic fields (keep these)
+  // ✅ EXISTING FIELDS - KEEP AS IS
   educationLevel    String?   // HIGH_SCHOOL, BACHELORS, MASTERS, PHD
   gpa               Float?
-  fieldsOfInterest  String[]  // KEEP THIS - existing field
-  targetCountries   String[]  // KEEP THIS - existing field
-  budgetRange       Json?     // KEEP THIS - existing field
+  fieldsOfInterest  String[]
+  targetCountries   String[]
+  budgetRange       Json?
   
-  // NEW fields for matching (add these)
-  fieldOfStudy      String?   // NEW - primary field of study
-  targetFields      String[]  // NEW - target fields for matching
-  scholarshipTypes  String[]  // NEW - FULL, PARTIAL, MERIT_BASED
-  
-  // Personal
-  skills            String[]  // NEW
+  // 🆕 NEW FIELDS - SAFE TO ADD (optional, nullable)
+  fieldOfStudy      String?
+  targetFields      String[]
+  scholarshipTypes  String[]
+  skills            String[]
   languages         String[]
   achievements      String[]
-  volunteerWork     Json?     // [{ organization, role, hours }]
-  
-  // Career Goals
+  volunteerWork     Json?
   careerGoal        String?
   interests         String[]
   researchAreas     String[]
@@ -79,6 +75,7 @@ model Scholarship {
   providerType      String
   scholarshipType   String
   
+  // ✅ EXISTING FIELDS - KEEP AS IS
   eligibilityRules  Json?
   targetFields      String[]
   targetNationalities String[]
@@ -111,16 +108,29 @@ model Scholarship {
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
   favoritedBy       Favorite[]
 
+  // 🆕 NEW FIELDS - SAFE TO ADD (optional, nullable)
+  country           String?   // Scholarship country
+  continent         String?   // US, EUROPE, ASIA, UK, AUSTRALIA, AFRICA, OTHER
+  universityCountry String?   // Country where you can study
+  requirements      Json?     // English proficiency, GPA, work experience, etc.
+  recentlyPosted    Boolean   @default(false)
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
+  // ✅ EXISTING INDEXES - KEEP AS IS
   @@index([provider])
   @@index([applicationDeadline])
   @@index([scholarshipType])
   @@index([isVerified])
   @@index([deletedAt])
   @@index([tags])
+  
+  // 🆕 NEW INDEXES - SAFE TO ADD
+  @@index([country])
+  @@index([continent])
+  @@index([universityCountry])
 }
 
 model Favorite {

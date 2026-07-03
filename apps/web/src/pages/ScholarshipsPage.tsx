@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Search, ExternalLink, Calendar, DollarSign, Globe, Heart, HeartOff, Loader2, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { ScholarshipFilters } from '@/components/filters/ScholarshipFilters';
 
 export function ScholarshipsPage() {
   const { user } = useAuth();
@@ -16,14 +17,36 @@ export function ScholarshipsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<any>({});
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
   const canCreate = user && (user.role === 'ADMIN' || user.role === 'EMPLOYEE');
 
+  // Build query params
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', '10');
+    if (searchTerm) params.append('search', searchTerm);
+    
+    // Add all filters
+    Object.keys(filters).forEach(key => {
+      if (Array.isArray(filters[key])) {
+        filters[key].forEach((value: string) => {
+          params.append(key, value);
+        });
+      } else if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+        params.append(key, String(filters[key]));
+      }
+    });
+    
+    return params.toString();
+  };
+
   // Fetch scholarships
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['scholarships', page, searchTerm],
-    queryFn: () => getScholarships(page, 10, searchTerm),
+    queryKey: ['scholarships', page, searchTerm, filters],
+    queryFn: () => getScholarships(buildQueryParams()),
     staleTime: 5000,
   });
 
@@ -90,6 +113,18 @@ export function ScholarshipsPage() {
     setPage(1);
   };
 
+  const handleApplyFilters = (appliedFilters: any) => {
+    setFilters(appliedFilters);
+    setPage(1);
+    refetch();
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+    setPage(1);
+    refetch();
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'No deadline';
     const date = new Date(dateString);
@@ -109,11 +144,21 @@ export function ScholarshipsPage() {
     return addFavoriteMutation.isPending || removeFavoriteMutation.isPending;
   };
 
+  const activeFilterCount = Object.values(filters).filter(
+    v => Array.isArray(v) ? v.length > 0 : v
+  ).length;
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h1 className="text-3xl font-bold">Scholarships</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <ScholarshipFilters
+            onApplyFilters={handleApplyFilters}
+            onClearFilters={handleClearFilters}
+            activeFilters={filters}
+            activeFilterCount={activeFilterCount}
+          />
           {user && (
             <Link to="/favorites">
               <Button variant="outline" className="flex items-center gap-2">
@@ -200,7 +245,6 @@ export function ScholarshipsPage() {
                             ✓ Verified
                           </span>
                         )}
-                        {/* Favorite Button */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -242,14 +286,14 @@ export function ScholarshipsPage() {
                       <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4 text-gray-400" />
                         <span>
-                          {scholarship.targetCountries.length > 0
+                          {scholarship.targetCountries?.length > 0
                             ? scholarship.targetCountries.join(', ')
                             : 'Global'}
                         </span>
                       </div>
 
                       <div className="flex flex-wrap gap-1 mt-3">
-                        {scholarship.targetFields.slice(0, 3).map((field) => (
+                        {scholarship.targetFields?.slice(0, 3).map((field) => (
                           <span
                             key={field}
                             className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full"
@@ -257,7 +301,7 @@ export function ScholarshipsPage() {
                             {field}
                           </span>
                         ))}
-                        {scholarship.targetFields.length > 3 && (
+                        {scholarship.targetFields?.length > 3 && (
                           <span className="text-xs text-gray-500">
                             +{scholarship.targetFields.length - 3} more
                           </span>
@@ -292,7 +336,7 @@ export function ScholarshipsPage() {
           {data.data.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-500">No scholarships found</p>
-              <p className="text-sm text-gray-400 mt-1">Try adjusting your search</p>
+              <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
             </div>
           )}
 
