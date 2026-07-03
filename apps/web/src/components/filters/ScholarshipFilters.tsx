@@ -16,10 +16,25 @@ import {
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+export interface FilterState {
+  country: string[];
+  continent: string[];
+  universityCountry: string[];
+  scholarshipType: string[];
+  field: string[];
+  englishProficiency: string[];
+  educationLevel: string[];
+  minAmount: string;
+  maxAmount: string;
+  minGpa: string;
+  minWorkExperience: string;
+  recentlyPosted: boolean;
+}
+
 interface ScholarshipFiltersProps {
-  onApplyFilters: (filters: any) => void;
+  onApplyFilters: (filters: Partial<FilterState>) => void;
   onClearFilters: () => void;
-  activeFilters: any;
+  activeFilters: Partial<FilterState>;
   activeFilterCount?: number;
 }
 
@@ -80,26 +95,28 @@ const ENGLISH_PROFICIENCY = [
   { label: 'Cambridge English', value: 'CAMBRIDGE' },
 ];
 
+const EMPTY_FILTERS: FilterState = {
+  country: [],
+  continent: [],
+  universityCountry: [],
+  scholarshipType: [],
+  field: [],
+  englishProficiency: [],
+  educationLevel: [],
+  minAmount: '',
+  maxAmount: '',
+  minGpa: '',
+  minWorkExperience: '',
+  recentlyPosted: false,
+};
+
 export function ScholarshipFilters({ 
   onApplyFilters, 
   onClearFilters, 
   activeFilters,
   activeFilterCount = 0 
 }: ScholarshipFiltersProps) {
-  const [filters, setFilters] = useState<any>({
-    country: [],
-    continent: [],
-    universityCountry: [],
-    scholarshipType: [],
-    field: [],
-    englishProficiency: [],
-    educationLevel: [],
-    minAmount: '',
-    maxAmount: '',
-    minGpa: '',
-    minWorkExperience: '',
-    recentlyPosted: false,
-  });
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     location: true,
@@ -110,20 +127,32 @@ export function ScholarshipFilters({
 
   useEffect(() => {
     if (activeFilters && Object.keys(activeFilters).length > 0) {
-      setFilters(prev => ({ ...prev, ...activeFilters }));
+      // Safely merge active filters with defaults
+      setFilters((prev: FilterState) => {
+        const merged = { ...prev };
+        (Object.keys(activeFilters) as Array<keyof FilterState>).forEach((key) => {
+          const value = activeFilters[key];
+          if (value !== undefined) {
+            // @ts-ignore - We know the types match
+            merged[key] = value;
+          }
+        });
+        return merged;
+      });
     }
   }, [activeFilters]);
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
+    setExpandedSections((prev: Record<string, boolean>) => ({
       ...prev,
       [section]: !prev[section],
     }));
   };
 
-  const handleCheckboxChange = (key: string, value: string) => {
-    setFilters((prev: any) => {
-      const current = prev[key] || [];
+  // Handle checkbox changes for array fields
+  const handleCheckboxChange = (key: keyof FilterState, value: string) => {
+    setFilters((prev: FilterState) => {
+      const current = prev[key] as string[] || [];
       const updated = current.includes(value)
         ? current.filter((v: string) => v !== value)
         : [...current, value];
@@ -131,40 +160,33 @@ export function ScholarshipFilters({
     });
   };
 
-  const handleInputChange = (key: string, value: string) => {
-    setFilters((prev: any) => ({ ...prev, [key]: value }));
+  // Handle input changes for string fields
+  const handleInputChange = (key: keyof FilterState, value: string) => {
+    setFilters((prev: FilterState) => ({ ...prev, [key]: value }));
+  };
+
+  // Handle boolean changes
+  const handleBooleanChange = (key: keyof FilterState, value: boolean) => {
+    setFilters((prev: FilterState) => ({ ...prev, [key]: value }));
   };
 
   const handleApply = () => {
-    const cleanedFilters: any = {};
-    Object.keys(filters).forEach(key => {
-      if (Array.isArray(filters[key]) && filters[key].length > 0) {
-        cleanedFilters[key] = filters[key];
-      } else if (typeof filters[key] === 'string' && filters[key].trim() !== '') {
-        cleanedFilters[key] = filters[key];
-      } else if (typeof filters[key] === 'boolean' && filters[key] === true) {
-        cleanedFilters[key] = filters[key];
+    const cleanedFilters: Partial<Record<keyof FilterState, string | string[] | boolean>> = {};
+    (Object.keys(filters) as Array<keyof FilterState>).forEach((key) => {
+      const value = filters[key];
+      if (Array.isArray(value) && value.length > 0) {
+        cleanedFilters[key] = value as string | string[] | boolean;
+      } else if (typeof value === 'string' && value.trim() !== '') {
+        cleanedFilters[key] = value;
+      } else if (typeof value === 'boolean' && value === true) {
+        cleanedFilters[key] = value;
       }
     });
-    onApplyFilters(cleanedFilters);
+    onApplyFilters(cleanedFilters as Partial<FilterState>);
   };
 
   const handleClear = () => {
-    const emptyFilters = {
-      country: [],
-      continent: [],
-      universityCountry: [],
-      scholarshipType: [],
-      field: [],
-      englishProficiency: [],
-      educationLevel: [],
-      minAmount: '',
-      maxAmount: '',
-      minGpa: '',
-      minWorkExperience: '',
-      recentlyPosted: false,
-    };
-    setFilters(emptyFilters);
+    setFilters(EMPTY_FILTERS);
     onClearFilters();
   };
 
@@ -397,9 +419,7 @@ export function ScholarshipFilters({
                   <label className="flex items-center space-x-2 text-sm">
                     <Checkbox
                       checked={filters.recentlyPosted}
-                      onCheckedChange={(checked) => {
-                        setFilters((prev: any) => ({ ...prev, recentlyPosted: checked === true }));
-                      }}
+                      onCheckedChange={(checked: boolean) => handleBooleanChange('recentlyPosted', checked)}
                     />
                     <span>Recently Posted (Last 30 days)</span>
                   </label>
