@@ -95,6 +95,7 @@ function App() {
             />
             <Route path="/scholarships" element={<ScholarshipsPage />} />
             <Route path="/scholarships/:id" element={<ScholarshipDetailsPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route
               path="/scholarships/create"
               element={

@@ -14,7 +14,7 @@ model User {
   emailVerified Boolean   @default(false)
   displayName   String?
   photoURL      String?
-  role          String    @default("VIEWER") // "VIEWER", "EMPLOYEE", "ADMIN"
+  role          String    @default("VIEWER")
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -24,6 +24,10 @@ model User {
   scholarships  Scholarship[] @relation("UserScholarships")
   favorites     Favorite[]
   verifiedScholarships Scholarship[] @relation("VerifiedScholarships")
+  
+  // NEW: Relations for payments
+  subscription  Subscription?
+  transactions  Transaction[]
 
   @@index([uid])
   @@index([email])
@@ -40,14 +44,12 @@ model Profile {
   nationality       String?
   countryOfResidence String?
   
-  // ✅ EXISTING FIELDS - KEEP AS IS
-  educationLevel    String?   // HIGH_SCHOOL, BACHELORS, MASTERS, PHD
+  educationLevel    String?
   gpa               Float?
   fieldsOfInterest  String[]
   targetCountries   String[]
   budgetRange       Json?
   
-  // 🆕 NEW FIELDS - SAFE TO ADD (optional, nullable)
   fieldOfStudy      String?
   targetFields      String[]
   scholarshipTypes  String[]
@@ -75,7 +77,10 @@ model Scholarship {
   providerType      String
   scholarshipType   String
   
-  // ✅ EXISTING FIELDS - KEEP AS IS
+  country           String?
+  continent         String?
+  universityCountry String?
+  
   eligibilityRules  Json?
   targetFields      String[]
   targetNationalities String[]
@@ -95,6 +100,7 @@ model Scholarship {
   requiredDocuments String[]
   essayPrompt       String?   @db.Text
   
+  requirements      Json?
   tags              String[]
   isVerified        Boolean   @default(false)
   lastVerifiedAt    DateTime?
@@ -108,26 +114,19 @@ model Scholarship {
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
   favoritedBy       Favorite[]
 
-  // 🆕 NEW FIELDS - SAFE TO ADD (optional, nullable)
-  country           String?   // Scholarship country
-  continent         String?   // US, EUROPE, ASIA, UK, AUSTRALIA, AFRICA, OTHER
-  universityCountry String?   // Country where you can study
-  requirements      Json?     // English proficiency, GPA, work experience, etc.
+  // ✅ KEEP THIS FIELD - DON'T REMOVE
   recentlyPosted    Boolean   @default(false)
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
 
-  // ✅ EXISTING INDEXES - KEEP AS IS
   @@index([provider])
   @@index([applicationDeadline])
   @@index([scholarshipType])
   @@index([isVerified])
   @@index([deletedAt])
   @@index([tags])
-  
-  // 🆕 NEW INDEXES - SAFE TO ADD
   @@index([country])
   @@index([continent])
   @@index([universityCountry])
@@ -145,4 +144,118 @@ model Favorite {
   @@unique([userId, scholarshipId])
   @@index([userId])
   @@index([scholarshipId])
+}
+
+model Subscription {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  planType          PlanType  @default(FREE)
+  planFeatures      Json?
+  
+  status            SubscriptionStatus @default(ACTIVE)
+  
+  amount            Int?
+  currency          String    @default("USD")
+  interval          String?
+  trialEndsAt       DateTime?
+  
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  canceledAt        DateTime?
+  pausedAt          DateTime?
+  
+  stripeSubscriptionId String? @unique
+  stripeCustomerId    String?
+  chapaTransactionId  String?  @unique
+  
+  cancellationReason String?
+  retentionAttempts  Int       @default(0)
+  
+  transactions      Transaction[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@index([planType])
+}
+
+enum PlanType {
+  FREE
+  PRO
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+  TRIAL
+  EXPIRED
+}
+
+model Transaction {
+  id                String    @id @default(cuid())
+  
+  userId            String?
+  user              User?     @relation(fields: [userId], references: [id])
+  
+  subscriptionId    String?
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
+  
+  amountUSD         Int?
+  amountETB         Int?
+  exchangeRate      Float?
+  
+  provider          PaymentProvider
+  providerTransactionId String?
+  providerStatus    String?
+  
+  type              TransactionType
+  status            TransactionStatus @default(PENDING)
+  
+  idempotencyKey    String    @unique
+  
+  metadata          Json?
+  failureReason     String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([provider])
+  @@index([providerTransactionId])
+  @@index([idempotencyKey])
+}
+
+enum PaymentProvider {
+  STRIPE
+  CHAPA
+}
+
+enum TransactionType {
+  SUBSCRIPTION_CREATE
+  SUBSCRIPTION_RENEW
+  SUBSCRIPTION_UPGRADE
+  SUBSCRIPTION_DOWNGRADE
+  REFUND
+  PAYMENT_FAILURE
+  RETRY
+  MANUAL
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELLED
 }

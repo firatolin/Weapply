@@ -47,6 +47,9 @@ export function Header() {
           <Link to="/scholarships" className="text-sm hover:text-primary">
             Scholarships
           </Link>
+          <Link to="/pricing" className="text-sm hover:text-primary">
+            Pricing
+          </Link>
           {user && (
             <Link to="/matches" className="text-sm hover:text-primary flex items-center gap-1">
               <Sparkles className="h-4 w-4" />

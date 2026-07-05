@@ -14,6 +14,7 @@ import { employeeRouter } from './routes/employee.routes.js';
 import { favoritesRouter } from './routes/favorites.routes.js';
 import { matchingRouter } from './routes/matching.routes.js';
 import { userRouter } from './routes/users.routes.js';
+import { paymentRouter } from './routes/payment.routes.js';
 
 const app: express.Application = express();
 const port = config.PORT;
@@ -81,6 +82,7 @@ app.use('/api/v1/employee', employeeRouter);
 app.use('/api/v1/favorites', favoritesRouter);
 app.use('/api/v1/matches', matchingRouter);
 app.use('/api/v1/users', userRouter);
+app.use('/api/v1/payment', paymentRouter);
 
 // 404 handler for undefined routes
 app.use((req: Request, res: Response) => {
