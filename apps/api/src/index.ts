@@ -31,10 +31,27 @@ app.use(
 // Compression
 app.use(compression());
 
-// Body parsing
+// Body parsing - but we need raw body for Stripe webhooks
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Store raw body for Stripe webhook verification
+app.use((req, res, next) => {
+  if (req.path === '/api/v1/payment/webhook/stripe') {
+    // Capture raw body for Stripe webhook verification
+    let data = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      (req as any).rawBody = data;
+      next();
+    });
+  } else {
+    next();
+  }
+});
 // Rate limiting
 const limiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW,

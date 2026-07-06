@@ -3,9 +3,14 @@ import { config } from '../config/index.js';
 import prisma from '../lib/prisma.js';
 import { FXService } from './fx.service.js';
 
+/**
+ * Define SubscriptionStatus type
+ */
+type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'TRIAL' | 'PAUSED';
+
 const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-06-30.basil',
-});
+    apiVersion: '2023-10-16',
+  });
 
 export class StripeService {
   /**
@@ -459,6 +464,7 @@ export class StripeService {
       incomplete_expired: 'CANCELED',
       trialing: 'TRIAL',
       unpaid: 'PAST_DUE',
+      paused: 'PAUSED', // Added the missing 'paused' property
     };
     return map[status] || 'PAST_DUE';
   }

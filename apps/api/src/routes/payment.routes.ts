@@ -6,7 +6,7 @@ import { AppError } from '../middleware/error.js';
 import prisma from '../lib/prisma.js';
 import { config } from '../config/index.js';
 
-const router = Router();
+const router: Router = Router();
 
 // Plan definitions
 const PLANS = {
@@ -210,38 +210,50 @@ router.post('/cancel', authMiddleware, async (req: AuthRequest, res: Response) =
  * POST /api/v1/payment/webhook/stripe
  * Stripe webhook handler
  */
+// POST: Webhook handler
 router.post('/webhook/stripe', async (req: Request, res: Response) => {
-  try {
-    const sig = req.headers['stripe-signature'] as string;
-    const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
-
-    let event;
-
     try {
-      // Import Stripe dynamically
-      const { default: Stripe } = await import('stripe');
-      const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
-        apiVersion: '2025-06-30.basil',
-      });
+      const sig = req.headers['stripe-signature'] as string;
+      const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
       
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        webhookSecret
-      );
-    } catch (err) {
-      console.error('⚠️ Webhook signature verification failed:', err);
-      return res.status(400).send(`Webhook Error: ${err}`);
+      // Get the raw body from the request
+      const rawBody = (req as any).rawBody;
+      
+      if (!rawBody) {
+        console.error('❌ No raw body available for webhook verification');
+        return res.status(400).send('Webhook Error: No raw body');
+      }
+  
+      let event;
+  
+      try {
+        // Import Stripe dynamically
+        const { default: Stripe } = await import('stripe');
+        const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
+          apiVersion: '2026-06-24.dahlia',
+        });
+        
+        // Use the raw body for signature verification
+        event = stripe.webhooks.constructEvent(
+          rawBody,
+          sig,
+          webhookSecret
+        );
+        
+        console.log(`✅ Webhook verified: ${event.type}`);
+      } catch (err) {
+        console.error('⚠️ Webhook signature verification failed:', err);
+        return res.status(400).send(`Webhook Error: ${err}`);
+      }
+  
+      // Handle the event
+      await StripeService.handleWebhook(event);
+  
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error('❌ Webhook error:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
     }
-
-    // Handle the event
-    await StripeService.handleWebhook(event);
-
-    res.status(200).json({ received: true });
-  } catch (error) {
-    console.error('❌ Webhook error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
-  }
-});
+  });
 
 export { router as paymentRouter };
