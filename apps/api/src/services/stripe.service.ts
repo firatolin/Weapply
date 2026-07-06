@@ -6,11 +6,11 @@ import { FXService } from './fx.service.js';
 /**
  * Define SubscriptionStatus type
  */
-type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'TRIAL' | 'PAUSED';
+type SubscriptionStatus = 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'TRIAL' | 'PAUSED' | 'EXPIRED';
 
 const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
-    apiVersion: '2023-10-16',
-  });
+  apiVersion: '2023-10-16',
+});
 
 export class StripeService {
   /**
@@ -232,6 +232,10 @@ export class StripeService {
   static async handleCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
     const { userId, planType } = session.metadata || {};
 
+    console.log('📋 Session metadata:', session.metadata);
+    console.log('👤 User ID from metadata:', userId);
+    console.log('📦 Plan type from metadata:', planType);
+
     if (!userId || !planType) {
       console.error('❌ Missing userId or planType in session metadata');
       return;
@@ -272,24 +276,34 @@ export class StripeService {
       },
     });
 
-    // Create transaction record
-    await prisma.transaction.create({
-      data: {
-        userId,
-        subscriptionId: subscription.id,
-        amountUSD: stripeSubscription.items.data[0]?.price?.unit_amount || 0,
-        provider: 'STRIPE',
-        providerTransactionId: session.id,
-        providerStatus: 'SUCCEEDED',
-        type: 'SUBSCRIPTION_CREATE',
-        status: 'SUCCEEDED',
-        idempotencyKey: session.id,
-        metadata: {
-          sessionId: session.id,
-          subscriptionId: stripeSubscriptionId,
+    // Create transaction record with duplicate handling
+    try {
+      await prisma.transaction.create({
+        data: {
+          userId,
+          subscriptionId: subscription.id,
+          amountUSD: stripeSubscription.items.data[0]?.price?.unit_amount || 0,
+          provider: 'STRIPE',
+          providerTransactionId: session.id,
+          providerStatus: 'SUCCEEDED',
+          type: 'SUBSCRIPTION_CREATE',
+          status: 'SUCCEEDED',
+          idempotencyKey: session.id,
+          metadata: {
+            sessionId: session.id,
+            subscriptionId: stripeSubscriptionId,
+          },
         },
-      },
-    });
+      });
+      console.log(`✅ Transaction recorded for user ${userId}`);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        console.log(`⚠️ Duplicate transaction detected, skipping: ${session.id}`);
+      } else {
+        console.error('❌ Error creating transaction:', error);
+        throw error;
+      }
+    }
 
     console.log(`✅ Stripe checkout completed for user ${userId} (${planType})`);
   }
@@ -304,14 +318,30 @@ export class StripeService {
       return;
     }
 
+    // Validate dates before updating
+    const currentPeriodStart = subscription.current_period_start 
+      ? new Date(subscription.current_period_start * 1000) 
+      : null;
+    const currentPeriodEnd = subscription.current_period_end 
+      ? new Date(subscription.current_period_end * 1000) 
+      : null;
+
+    // Only update if dates are valid
+    const updateData: any = {
+      status: this.mapStripeStatus(subscription.status),
+      canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+    };
+
+    if (currentPeriodStart && !isNaN(currentPeriodStart.getTime())) {
+      updateData.currentPeriodStart = currentPeriodStart;
+    }
+    if (currentPeriodEnd && !isNaN(currentPeriodEnd.getTime())) {
+      updateData.currentPeriodEnd = currentPeriodEnd;
+    }
+
     await prisma.subscription.update({
       where: { stripeSubscriptionId: subscription.id },
-      data: {
-        status: this.mapStripeStatus(subscription.status),
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
-      },
+      data: updateData,
     });
 
     console.log(`🔄 Stripe subscription updated for user ${userId}`);
@@ -361,27 +391,36 @@ export class StripeService {
     const rate = await FXService.getUSDtoETB();
     const amountETB = invoice.amount_paid ? Math.round(invoice.amount_paid / 100 * rate) : 0;
 
-    await prisma.transaction.create({
-      data: {
-        userId: subscription.userId,
-        subscriptionId: subscription.id,
-        amountUSD: invoice.amount_paid || 0,
-        amountETB: amountETB,
-        exchangeRate: rate,
-        provider: 'STRIPE',
-        providerTransactionId: invoice.id,
-        providerStatus: 'SUCCEEDED',
-        type: 'SUBSCRIPTION_RENEW',
-        status: 'SUCCEEDED',
-        idempotencyKey: invoice.id,
-        metadata: {
-          invoiceId: invoice.id,
-          subscriptionId,
+    // Create transaction with duplicate handling
+    try {
+      await prisma.transaction.create({
+        data: {
+          userId: subscription.userId,
+          subscriptionId: subscription.id,
+          amountUSD: invoice.amount_paid || 0,
+          amountETB: amountETB,
+          exchangeRate: rate,
+          provider: 'STRIPE',
+          providerTransactionId: invoice.id,
+          providerStatus: 'SUCCEEDED',
+          type: 'SUBSCRIPTION_RENEW',
+          status: 'SUCCEEDED',
+          idempotencyKey: invoice.id,
+          metadata: {
+            invoiceId: invoice.id,
+            subscriptionId,
+          },
         },
-      },
-    });
-
-    console.log(`💳 Stripe payment succeeded for user ${subscription.userId}`);
+      });
+      console.log(`💳 Stripe payment succeeded for user ${subscription.userId}`);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        console.log(`⚠️ Duplicate payment transaction detected, skipping: ${invoice.id}`);
+      } else {
+        console.error('❌ Error creating payment transaction:', error);
+        throw error;
+      }
+    }
   }
 
   /**
@@ -412,28 +451,36 @@ export class StripeService {
     });
 
     // Create transaction record
-    await prisma.transaction.create({
-      data: {
-        userId: subscription.userId,
-        subscriptionId: subscription.id,
-        amountUSD: invoice.amount_due || 0,
-        provider: 'STRIPE',
-        providerTransactionId: invoice.id,
-        providerStatus: 'FAILED',
-        type: 'PAYMENT_FAILURE',
-        status: 'FAILED',
-        idempotencyKey: invoice.id,
-        failureReason: invoice.attempt_count > 3 ? 'MAX_ATTEMPTS_EXCEEDED' : 'PAYMENT_DECLINED',
-        metadata: {
-          invoiceId: invoice.id,
-          subscriptionId,
-          attemptCount: invoice.attempt_count,
-          nextPaymentAttempt: invoice.next_payment_attempt,
+    try {
+      await prisma.transaction.create({
+        data: {
+          userId: subscription.userId,
+          subscriptionId: subscription.id,
+          amountUSD: invoice.amount_due || 0,
+          provider: 'STRIPE',
+          providerTransactionId: invoice.id,
+          providerStatus: 'FAILED',
+          type: 'PAYMENT_FAILURE',
+          status: 'FAILED',
+          idempotencyKey: invoice.id,
+          failureReason: invoice.attempt_count > 3 ? 'MAX_ATTEMPTS_EXCEEDED' : 'PAYMENT_DECLINED',
+          metadata: {
+            invoiceId: invoice.id,
+            subscriptionId,
+            attemptCount: invoice.attempt_count,
+            nextPaymentAttempt: invoice.next_payment_attempt,
+          },
         },
-      },
-    });
-
-    console.log(`❌ Stripe payment failed for user ${subscription.userId}`);
+      });
+      console.log(`❌ Stripe payment failed for user ${subscription.userId}`);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        console.log(`⚠️ Duplicate failure transaction detected, skipping: ${invoice.id}`);
+      } else {
+        console.error('❌ Error creating failure transaction:', error);
+        throw error;
+      }
+    }
   }
 
   /**
@@ -464,7 +511,7 @@ export class StripeService {
       incomplete_expired: 'CANCELED',
       trialing: 'TRIAL',
       unpaid: 'PAST_DUE',
-      paused: 'PAUSED', // Added the missing 'paused' property
+      paused: 'PAUSED',
     };
     return map[status] || 'PAST_DUE';
   }
