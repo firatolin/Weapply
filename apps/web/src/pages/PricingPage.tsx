@@ -13,7 +13,7 @@ interface Plan {
   name: string;
   price: number;
   currency: string;
-  priceETB: number;
+  priceETB: number | null;
   features: string[];
   rate: number;
 }
@@ -30,8 +30,10 @@ export function PricingPage() {
   useEffect(() => {
     const fetchPlans = async () => {
       try {
+        console.log('📡 Fetching plans...');
         const response = await apiClient.get('/payment/plans');
-        setPlans(response.data.data);
+        console.log('📊 Plans response:', response.data);
+        setPlans(response.data.data || []);
         setLoading(false);
       } catch (error) {
         console.error('❌ Error fetching plans:', error);
@@ -62,13 +64,11 @@ export function PricingPage() {
       return;
     }
 
-    // If user is already on this plan, don't let them subscribe again
     if (currentPlan === planId && planId !== 'FREE') {
       toast.info(`You're already on the ${planId} plan`);
       return;
     }
 
-    // If upgrading from free to pro/premium
     if (planId === 'FREE') {
       toast.info('You are already on the Free plan');
       return;
@@ -86,7 +86,6 @@ export function PricingPage() {
         cancelUrl,
       });
 
-      // Redirect to Stripe checkout
       window.location.href = response.data.data.url;
     } catch (error: any) {
       console.error('❌ Error creating checkout:', error);
@@ -120,6 +119,14 @@ export function PricingPage() {
       return <Badge className="bg-yellow-100 text-yellow-800">Best Value</Badge>;
     }
     return null;
+  };
+
+  // Safe formatter for ETB price
+  const formatETB = (priceETB: number | null) => {
+    if (priceETB === null || priceETB === undefined) {
+      return 'N/A';
+    }
+    return priceETB.toLocaleString();
   };
 
   if (loading) {
@@ -168,9 +175,9 @@ export function PricingPage() {
                     <span className="text-sm text-muted-foreground ml-1">/month</span>
                   )}
                 </div>
-                {plan.price > 0 && (
+                {plan.price > 0 && plan.priceETB !== null && (
                   <p className="text-sm text-muted-foreground">
-                    ≈ {plan.priceETB.toLocaleString()} ETB
+                    ≈ {formatETB(plan.priceETB)} ETB
                   </p>
                 )}
                 <div className="mt-2">{getPlanBadge(plan.id)}</div>
