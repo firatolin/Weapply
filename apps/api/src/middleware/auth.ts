@@ -29,6 +29,9 @@ export const authMiddleware = async (
     const token = authHeader.split(' ')[1];
     
     // Verify Firebase token
+    if (!adminAuth) {
+      throw new AppError(500, 'INTERNAL_SERVER_ERROR', 'Firebase admin is not initialized');
+    }
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Get user info from Firebase

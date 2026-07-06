@@ -8,6 +8,11 @@ import { config } from '../config/index.js';
 
 const router: Router = Router();
 
+// Test route
+router.get('/test', (req: Request, res: Response) => {
+  res.json({ message: 'Payment route is working!' });
+});
+
 // Plan definitions
 const PLANS = {
   FREE: {
@@ -56,7 +61,6 @@ const PLANS = {
  */
 router.get('/plans', async (req: Request, res: Response) => {
   try {
-    // Get current ETB rate for display
     const rate = await FXService.getUSDtoETB();
     
     const plansWithETB = Object.values(PLANS).map((plan) => ({
@@ -98,7 +102,6 @@ router.post('/create-checkout', authMiddleware, async (req: AuthRequest, res: Re
       throw new AppError(401, 'UNAUTHORIZED', 'User not authenticated');
     }
 
-    // Create Stripe checkout session
     const sessionUrl = await StripeService.createCheckoutSession(
       userId,
       email,
@@ -142,7 +145,6 @@ router.get('/current', authMiddleware, async (req: AuthRequest, res: Response) =
       },
     });
 
-    // Get ETB rate for display
     const rate = await FXService.getUSDtoETB();
 
     res.json({
@@ -181,12 +183,10 @@ router.post('/cancel', authMiddleware, async (req: AuthRequest, res: Response) =
       throw new AppError(404, 'NOT_FOUND', 'No active subscription found');
     }
 
-    // Cancel in Stripe if it's a Stripe subscription
     if (subscription.stripeSubscriptionId) {
       await StripeService.cancelSubscription(subscription.stripeSubscriptionId);
     }
 
-    // Update in database
     await prisma.subscription.update({
       where: { userId },
       data: {
@@ -210,50 +210,43 @@ router.post('/cancel', authMiddleware, async (req: AuthRequest, res: Response) =
  * POST /api/v1/payment/webhook/stripe
  * Stripe webhook handler
  */
-// POST: Webhook handler
 router.post('/webhook/stripe', async (req: Request, res: Response) => {
-    try {
-      const sig = req.headers['stripe-signature'] as string;
-      const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
-      
-      // Get the raw body from the request
-      const rawBody = (req as any).rawBody;
-      
-      if (!rawBody) {
-        console.error('❌ No raw body available for webhook verification');
-        return res.status(400).send('Webhook Error: No raw body');
-      }
+  console.log('📥 Webhook received');
   
-      let event;
-  
-      try {
-        // Import Stripe dynamically
-        const { default: Stripe } = await import('stripe');
-        const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
-          apiVersion: '2026-06-24.dahlia',
-        });
-        
-        // Use the raw body for signature verification
-        event = stripe.webhooks.constructEvent(
-          rawBody,
-          sig,
-          webhookSecret
-        );
-        
-        console.log(`✅ Webhook verified: ${event.type}`);
-      } catch (err) {
-        console.error('⚠️ Webhook signature verification failed:', err);
-        return res.status(400).send(`Webhook Error: ${err}`);
-      }
-  
-      // Handle the event
-      await StripeService.handleWebhook(event);
-  
-      res.status(200).json({ received: true });
-    } catch (error) {
-      console.error('❌ Webhook error:', error);
-      res.status(500).json({ error: 'Webhook processing failed' });
+  try {
+    const sig = req.headers['stripe-signature'] as string;
+    const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
+    
+    // Raw body is already in req.body as a Buffer
+    const rawBody = req.body;
+    
+    console.log('📦 Raw body length:', rawBody?.length || 0);
+    
+    if (!rawBody || rawBody.length === 0) {
+      console.error('❌ No raw body');
+      return res.status(400).send('Webhook Error: No raw body');
     }
-  });
+
+    const { default: Stripe } = await import('stripe');
+    const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16',
+    });
+    
+    const event = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      webhookSecret
+    );
+    
+    console.log(`✅ Webhook verified: ${event.type}`);
+    
+    await StripeService.handleWebhook(event);
+    
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('❌ Webhook error:', err);
+    res.status(400).send(`Webhook Error: ${err}`);
+  }
+});
 
 export { router as paymentRouter };

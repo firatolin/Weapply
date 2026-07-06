@@ -18,6 +18,7 @@ import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { ProfileEditPage } from './pages/ProfileEditPage';
 import { MatchesPage } from './pages/MatchesPage';
 import { MatchDetailsPage } from './pages/MatchDetailsPage';
+import { PricingPage } from './pages/PricingPage';
 
 function App() {
   return (
