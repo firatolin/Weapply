@@ -186,6 +186,55 @@ model UniversityMatch {
   @@index([status])
 }
 
+model Image {
+  id              String    @id @default(cuid())
+  
+  // Reference
+  universityId    String?
+  university      University? @relation(fields: [universityId], references: [id])
+  scholarshipId   String?
+  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
+  
+  // Image Data
+  url             String    // CDN URL
+  thumbnailUrl    String?   // Small version
+  mediumUrl       String?   // Medium version
+  largeUrl        String?   // Large version
+  
+  // Attribution (required for Unsplash/Wikimedia)
+  source          ImageSource
+  sourceId        String?   // Original ID from source
+  attribution     Json?     // { photographer: "Name", license: "CC0", link: "url" }
+  
+  // Metadata
+  alt             String?
+  caption         String?
+  width           Int?
+  height          Int?
+  fileSize        Int?      // In bytes
+  
+  // Quality
+  isVerified      Boolean   @default(false)
+  verificationNote String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([universityId])
+  @@index([scholarshipId])
+  @@index([source])
+  @@index([isVerified])
+}
+
+enum ImageSource {
+  MAPBOX
+  WIKIMEDIA
+  UNSPLASH
+  ADMIN_UPLOAD
+  USER_UPLOAD
+}
+
 model Document {
   id              String    @id @default(cuid())
   userId          String
