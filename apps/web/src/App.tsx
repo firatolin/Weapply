@@ -19,6 +19,7 @@ import { ProfileEditPage } from './pages/ProfileEditPage';
 import { MatchesPage } from './pages/MatchesPage';
 import { MatchDetailsPage } from './pages/MatchDetailsPage';
 import { PricingPage } from './pages/PricingPage';
+import { DocumentGeneratorPage } from './pages/DocumentGeneratorPage';
 
 function App() {
   return (
@@ -77,6 +78,14 @@ function App() {
                 <FavoritesPage />
               </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute>
+                  <DocumentGeneratorPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/admin"

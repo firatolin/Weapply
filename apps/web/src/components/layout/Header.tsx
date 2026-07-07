@@ -57,6 +57,11 @@ export function Header() {
             </Link>
           )}
           {user && (
+            <Link to="/documents" className="text-sm hover:text-primary">
+              Documents
+            </Link>
+          )}
+          {user && (
             <Link to={getDashboardLink()} className="text-sm hover:text-primary">
               Dashboard
             </Link>

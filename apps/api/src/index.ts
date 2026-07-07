@@ -13,6 +13,7 @@ import { userRouter } from './routes/users.routes.js';
 import { matchingRouter } from './routes/matching.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
+import { documentRouter } from './routes/documents.routes.js';
 
 const app = express();
 const port = config.PORT;
@@ -87,6 +88,7 @@ app.use('/api/v1/users', userRouter);
 app.use('/api/v1/matches', matchingRouter);
 app.use('/api/v1/payment', paymentRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/documents', documentRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

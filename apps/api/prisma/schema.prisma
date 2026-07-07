@@ -26,7 +26,11 @@ model User {
   verifiedScholarships Scholarship[] @relation("VerifiedScholarships")
   subscription  Subscription?
   transactions  Transaction[]
-  documents     Document[]    // NEW
+  documents     Document[]    // ✅ Already exists
+  
+  // NEW RELATIONS
+  universityMatches UniversityMatch[]  // ✅ ADD THIS
+  outreachCandidates OutreachCandidate[]  // ✅ ADD THIS
 
   @@index([uid])
   @@index([email])
@@ -51,8 +55,8 @@ model University {
   foundedYear       Int?
   publicPrivate     PublicPrivate?
   enrollment        Int?
-  internationalRate Float?    // % of international students
-  acceptanceRate    Float?    // 0.0-1.0
+  internationalRate Float?
+  acceptanceRate    Float?
   ranking           Int?
   
   // Contact
@@ -61,7 +65,7 @@ model University {
   internationalOffice String?
   
   // Financial
-  avgTuitionLocal   Int?      // per year in cents USD
+  avgTuitionLocal   Int?
   avgTuitionInternational Int?
   avgLivingCosts    Int?
   
@@ -80,6 +84,9 @@ model University {
   matches           UniversityMatch[]
   outreachCampaigns OutreachCampaign[]
   
+  // NEW RELATION
+  documents         Document[]  // ✅ ADD THIS
+
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
@@ -484,8 +491,11 @@ model Scholarship {
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
   favoritedBy       Favorite[]
 
-  // ✅ KEEP THIS FIELD - DON'T REMOVE
   recentlyPosted    Boolean   @default(false)
+
+  // NEW RELATIONS
+  images            Image[]   // ✅ ADD THIS
+  documents         Document[]  // ✅ ADD THIS
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
