@@ -226,13 +226,102 @@ model Image {
   @@index([source])
   @@index([isVerified])
 }
-
 enum ImageSource {
   MAPBOX
   WIKIMEDIA
   UNSPLASH
   ADMIN_UPLOAD
   USER_UPLOAD
+}
+
+model OutreachCampaign {
+  id                String    @id @default(cuid())
+  
+  // Institution
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id])
+  
+  // Campaign Details
+  name              String
+  description       String?
+  status            String    @default("DRAFT")
+  
+  // Targeting
+  targetCriteria    Json?     // { fields: ["CS"], nationality: ["US"], minGPA: 3.0 }
+  
+  // Content
+  emailTemplate     String?   @db.Text
+  tone              String    @default("FORMAL")
+  branding          Json?     // { logo: "url", colors: [] }
+  
+  // Tracking
+  candidates        OutreachCandidate[]
+  
+  // Analytics
+  sentCount         Int       @default(0)
+  openedCount       Int       @default(0)
+  repliedCount      Int       @default(0)
+  convertedCount    Int       @default(0)
+  
+  // Metadata
+  createdBy         String    // Admin ID
+  approvedBy        String?   // Admin ID (if required)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([universityId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OutreachCandidate {
+  id                String    @id @default(cuid())
+  
+  campaignId        String
+  campaign          OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // User Details (with consent)
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  
+  // Consent
+  consentProvided   Boolean   @default(false)
+  consentGivenAt    DateTime?
+  consentVersion    String?   // Version of consent form
+  
+  // Outreach Status
+  status            String    @default("PENDING")
+  
+  // Communication
+  emailSentAt       DateTime?
+  emailOpenedAt     DateTime?
+  emailRepliedAt    DateTime?
+  conversionStatus  String    @default("NOT_CONVERTED")
+  
+  // Matching Context
+  matchScore        Float?    // How well they matched the campaign
+  matchExplanation  String?   @db.Text
+  matchVersion      String?   // Matching rubric version
+  
+  // Generated Content
+  generatedEmail    String?   @db.Text
+  personalization   Json?     // { name, university, field, highlights }
+  
+  // Metadata
+  notes             String?   @db.Text
+  tags              String[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([campaignId])
+  @@index([userId])
+  @@index([status])
+  @@index([consentProvided])
+  @@index([matchScore])
 }
 
 model Document {
