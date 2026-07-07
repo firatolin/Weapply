@@ -24,15 +24,247 @@ model User {
   scholarships  Scholarship[] @relation("UserScholarships")
   favorites     Favorite[]
   verifiedScholarships Scholarship[] @relation("VerifiedScholarships")
-  
-  // NEW: Relations for payments
   subscription  Subscription?
   transactions  Transaction[]
+  documents     Document[]    // NEW
 
   @@index([uid])
   @@index([email])
   @@index([deletedAt])
   @@index([role])
+}
+
+model University {
+  id                String    @id @default(cuid())
+  name              String
+  shortName         String?
+  description       String?   @db.Text
+  website           String?
+  address           String?
+  country           String
+  city              String
+  postalCode        String?
+  latitude          Float?
+  longitude         Float?
+  
+  // Academic
+  foundedYear       Int?
+  publicPrivate     PublicPrivate?
+  enrollment        Int?
+  internationalRate Float?    // % of international students
+  acceptanceRate    Float?    // 0.0-1.0
+  ranking           Int?
+  
+  // Contact
+  admissionsEmail   String?
+  admissionsPhone   String?
+  internationalOffice String?
+  
+  // Financial
+  avgTuitionLocal   Int?      // per year in cents USD
+  avgTuitionInternational Int?
+  avgLivingCosts    Int?
+  
+  // Content
+  programs          Program[]
+  images            Image[]
+  
+  // Metadata
+  tags              String[]
+  isVerified        Boolean   @default(false)
+  lastVerifiedAt    DateTime?
+  source            String
+  viewCount         Int       @default(0)
+  
+  // Relationships
+  matches           UniversityMatch[]
+  outreachCampaigns OutreachCampaign[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([name])
+  @@index([country])
+  @@index([city])
+  @@index([latitude, longitude])
+  @@index([deletedAt])
+}
+
+enum PublicPrivate {
+  PUBLIC
+  PRIVATE
+  OTHER
+}
+
+model Program {
+  id                String    @id @default(cuid())
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  name              String
+  degreeLevel       DegreeLevel
+  field             String
+  specialization    String?
+  
+  // Academic
+  durationMonths    Int?
+  language          String    @default("English")
+  admissionRequirements Json?  // { gpa: 3.0, tests: ["TOEFL"], prerequisites: [] }
+  
+  // Financial
+  tuitionLocal      Int?      // per year
+  tuitionInternational Int?
+  hasScholarships   Boolean   @default(false)
+  
+  // Deadlines
+  applicationDeadline DateTime?
+  startDate         DateTime?
+  endDate           DateTime?
+  
+  // Metadata
+  isActive          Boolean   @default(true)
+  lastVerifiedAt    DateTime?
+  
+  // Relationships
+  matches           UniversityMatch[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([universityId])
+  @@index([field])
+  @@index([degreeLevel])
+}
+
+enum DegreeLevel {
+  BACHELORS
+  MASTERS
+  PHD
+  CERTIFICATE
+  ASSOCIATE
+  OTHER
+}
+
+model UniversityMatch {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id])
+  programId         String?
+  program           Program?   @relation(fields: [programId], references: [id])
+  
+  // Scoring
+  admissionProbability Float   // 0.0-1.0
+  probabilityRange  Json?     // { lower: 0.6, upper: 0.8 }
+  confidence        Float
+  fitScore          Float
+  financialFit      Float?
+  
+  // Breakdown
+  scoreBreakdown    Json?     // { academics: 0.8, extracurriculars: 0.7, essays: 0.6 }
+  methodology       String    // "RULE_BASED", "ML_MODEL", "AI_GENERATED"
+  
+  // Explanations
+  positiveFactors   String[]
+  improvementAreas  String[]
+  summary           String?   @db.Text
+  
+  // Metadata
+  matchType         String    @default("UNIVERSITY")
+  status            String    @default("PENDING")
+  version           String
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([universityId])
+  @@index([admissionProbability])
+  @@index([status])
+}
+
+model Document {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Document Info
+  title           String
+  type            DocumentType
+  description     String?
+  
+  // Generation
+  promptVersion   String?   // Version of prompt used
+  aiModel         String?   // "gemini-pro", "gemini-flash"
+  
+  // Content Storage
+  currentVersionId String?
+  versions        DocumentVersion[]
+  
+  // Metadata
+  wordCount       Int?
+  language        String    @default("English")
+  isGenerated     Boolean   @default(true)
+  isEdited        Boolean   @default(false)
+  
+  // Application Context
+  scholarshipId   String?
+  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
+  universityId    String?
+  university      University? @relation(fields: [universityId], references: [id])
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([type])
+  @@index([scholarshipId])
+  @@index([deletedAt])
+}
+
+enum DocumentType {
+  CV
+  SOP
+  MOTIVATION_LETTER
+  ESSAY
+  RECOMMENDATION_EMAIL
+  APPLICATION_EMAIL
+  OUTREACH_EMAIL
+  OTHER
+}
+
+model DocumentVersion {
+  id              String    @id @default(cuid())
+  documentId      String
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  // Content
+  content         String    @db.Text
+  contentDelta    Json?     // For diff tracking
+  wordCount       Int?
+  
+  // Generation Context
+  generationPrompt String?   @db.Text // The actual prompt used
+  generationParams Json?     // { temperature, maxTokens, etc. }
+  
+  // Quality
+  aiScore         Float?    // Self-assessment of quality
+  userRating      Int?      // 1-5
+  
+  // Metadata
+  versionNumber   Int
+  isCurrent       Boolean   @default(false)
+  changeDescription String?
+  
+  createdAt       DateTime  @default(now())
+
+  @@index([documentId])
+  @@index([versionNumber])
+  @@index([isCurrent])
 }
 
 model Profile {
