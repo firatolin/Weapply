@@ -21,6 +21,7 @@ import { MatchDetailsPage } from './pages/MatchDetailsPage';
 import { PricingPage } from './pages/PricingPage';
 import { DocumentGeneratorPage } from './pages/DocumentGeneratorPage';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { DeadlinesPage } from './pages/DeadlinesPage';
 
 function App() {
   return (
@@ -86,6 +87,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <DocumentGeneratorPage />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route
+                path="/deadlines"
+                element={
+                  <ProtectedRoute>
+                    <DeadlinesPage />
                   </ProtectedRoute>
                 }
               />

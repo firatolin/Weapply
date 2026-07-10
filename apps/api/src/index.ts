@@ -14,7 +14,7 @@ import { matchingRouter } from './routes/matching.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { documentRouter } from './routes/documents.routes.js';
-// import { deadlineRouter } from './routes/deadlines.routes.js';
+import { deadlineRouter } from './routes/deadlines.routes.js';
 
 const app = express();
 const port = config.PORT;
@@ -97,7 +97,7 @@ app.use('/api/v1/matches', matchingRouter);
 app.use('/api/v1/payment', paymentRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/documents', documentRouter);
-// app.use('/api/v1/deadlines', deadlineRouter);
+app.use('/api/v1/deadlines', deadlineRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

@@ -49,6 +49,9 @@ export function Header() {
           <Link to="/scholarships" className="text-sm hover:text-primary">
             Scholarships
           </Link>
+          <Link to="/deadlines" className="text-sm hover:text-primary">
+            Deadlines
+          </Link>
           <Link to="/pricing" className="text-sm hover:text-primary">
             Pricing
           </Link>

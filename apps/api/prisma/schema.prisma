@@ -26,390 +26,15 @@ model User {
   verifiedScholarships Scholarship[] @relation("VerifiedScholarships")
   subscription  Subscription?
   transactions  Transaction[]
-  documents     Document[]    // ✅ Already exists
-  
-  // NEW RELATIONS
-  universityMatches UniversityMatch[]  // ✅ ADD THIS
-  outreachCandidates OutreachCandidate[]  // ✅ ADD THIS
+  documents     Document[]
+  universityMatches UniversityMatch[]
+  outreachCandidates OutreachCandidate[]
+  deadlines     Deadline[]    // NEW
 
   @@index([uid])
   @@index([email])
   @@index([deletedAt])
   @@index([role])
-}
-
-model University {
-  id                String    @id @default(cuid())
-  name              String
-  shortName         String?
-  description       String?   @db.Text
-  website           String?
-  address           String?
-  country           String
-  city              String
-  postalCode        String?
-  latitude          Float?
-  longitude         Float?
-  
-  // Academic
-  foundedYear       Int?
-  publicPrivate     PublicPrivate?
-  enrollment        Int?
-  internationalRate Float?
-  acceptanceRate    Float?
-  ranking           Int?
-  
-  // Contact
-  admissionsEmail   String?
-  admissionsPhone   String?
-  internationalOffice String?
-  
-  // Financial
-  avgTuitionLocal   Int?
-  avgTuitionInternational Int?
-  avgLivingCosts    Int?
-  
-  // Content
-  programs          Program[]
-  images            Image[]
-  
-  // Metadata
-  tags              String[]
-  isVerified        Boolean   @default(false)
-  lastVerifiedAt    DateTime?
-  source            String
-  viewCount         Int       @default(0)
-  
-  // Relationships
-  matches           UniversityMatch[]
-  outreachCampaigns OutreachCampaign[]
-  
-  // NEW RELATION
-  documents         Document[]  // ✅ ADD THIS
-
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
-
-  @@index([name])
-  @@index([country])
-  @@index([city])
-  @@index([latitude, longitude])
-  @@index([deletedAt])
-}
-
-enum PublicPrivate {
-  PUBLIC
-  PRIVATE
-  OTHER
-}
-
-model Program {
-  id                String    @id @default(cuid())
-  universityId      String
-  university        University @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  name              String
-  degreeLevel       DegreeLevel
-  field             String
-  specialization    String?
-  
-  // Academic
-  durationMonths    Int?
-  language          String    @default("English")
-  admissionRequirements Json?  // { gpa: 3.0, tests: ["TOEFL"], prerequisites: [] }
-  
-  // Financial
-  tuitionLocal      Int?      // per year
-  tuitionInternational Int?
-  hasScholarships   Boolean   @default(false)
-  
-  // Deadlines
-  applicationDeadline DateTime?
-  startDate         DateTime?
-  endDate           DateTime?
-  
-  // Metadata
-  isActive          Boolean   @default(true)
-  lastVerifiedAt    DateTime?
-  
-  // Relationships
-  matches           UniversityMatch[]
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
-
-  @@index([universityId])
-  @@index([field])
-  @@index([degreeLevel])
-}
-
-enum DegreeLevel {
-  BACHELORS
-  MASTERS
-  PHD
-  CERTIFICATE
-  ASSOCIATE
-  OTHER
-}
-
-model UniversityMatch {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  universityId      String
-  university        University @relation(fields: [universityId], references: [id])
-  programId         String?
-  program           Program?   @relation(fields: [programId], references: [id])
-  
-  // Scoring
-  admissionProbability Float   // 0.0-1.0
-  probabilityRange  Json?     // { lower: 0.6, upper: 0.8 }
-  confidence        Float
-  fitScore          Float
-  financialFit      Float?
-  
-  // Breakdown
-  scoreBreakdown    Json?     // { academics: 0.8, extracurriculars: 0.7, essays: 0.6 }
-  methodology       String    // "RULE_BASED", "ML_MODEL", "AI_GENERATED"
-  
-  // Explanations
-  positiveFactors   String[]
-  improvementAreas  String[]
-  summary           String?   @db.Text
-  
-  // Metadata
-  matchType         String    @default("UNIVERSITY")
-  status            String    @default("PENDING")
-  version           String
-  
-  // Timestamps
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([universityId])
-  @@index([admissionProbability])
-  @@index([status])
-}
-
-model Image {
-  id              String    @id @default(cuid())
-  
-  // Reference
-  universityId    String?
-  university      University? @relation(fields: [universityId], references: [id])
-  scholarshipId   String?
-  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
-  
-  // Image Data
-  url             String    // CDN URL
-  thumbnailUrl    String?   // Small version
-  mediumUrl       String?   // Medium version
-  largeUrl        String?   // Large version
-  
-  // Attribution (required for Unsplash/Wikimedia)
-  source          ImageSource
-  sourceId        String?   // Original ID from source
-  attribution     Json?     // { photographer: "Name", license: "CC0", link: "url" }
-  
-  // Metadata
-  alt             String?
-  caption         String?
-  width           Int?
-  height          Int?
-  fileSize        Int?      // In bytes
-  
-  // Quality
-  isVerified      Boolean   @default(false)
-  verificationNote String?
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-
-  @@index([universityId])
-  @@index([scholarshipId])
-  @@index([source])
-  @@index([isVerified])
-}
-enum ImageSource {
-  MAPBOX
-  WIKIMEDIA
-  UNSPLASH
-  ADMIN_UPLOAD
-  USER_UPLOAD
-}
-
-model OutreachCampaign {
-  id                String    @id @default(cuid())
-  
-  // Institution
-  universityId      String
-  university        University @relation(fields: [universityId], references: [id])
-  
-  // Campaign Details
-  name              String
-  description       String?
-  status            String    @default("DRAFT")
-  
-  // Targeting
-  targetCriteria    Json?     // { fields: ["CS"], nationality: ["US"], minGPA: 3.0 }
-  
-  // Content
-  emailTemplate     String?   @db.Text
-  tone              String    @default("FORMAL")
-  branding          Json?     // { logo: "url", colors: [] }
-  
-  // Tracking
-  candidates        OutreachCandidate[]
-  
-  // Analytics
-  sentCount         Int       @default(0)
-  openedCount       Int       @default(0)
-  repliedCount      Int       @default(0)
-  convertedCount    Int       @default(0)
-  
-  // Metadata
-  createdBy         String    // Admin ID
-  approvedBy        String?   // Admin ID (if required)
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
-
-  @@index([universityId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model OutreachCandidate {
-  id                String    @id @default(cuid())
-  
-  campaignId        String
-  campaign          OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  
-  // User Details (with consent)
-  userId            String
-  user              User      @relation(fields: [userId], references: [id])
-  
-  // Consent
-  consentProvided   Boolean   @default(false)
-  consentGivenAt    DateTime?
-  consentVersion    String?   // Version of consent form
-  
-  // Outreach Status
-  status            String    @default("PENDING")
-  
-  // Communication
-  emailSentAt       DateTime?
-  emailOpenedAt     DateTime?
-  emailRepliedAt    DateTime?
-  conversionStatus  String    @default("NOT_CONVERTED")
-  
-  // Matching Context
-  matchScore        Float?    // How well they matched the campaign
-  matchExplanation  String?   @db.Text
-  matchVersion      String?   // Matching rubric version
-  
-  // Generated Content
-  generatedEmail    String?   @db.Text
-  personalization   Json?     // { name, university, field, highlights }
-  
-  // Metadata
-  notes             String?   @db.Text
-  tags              String[]
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime?
-
-  @@index([campaignId])
-  @@index([userId])
-  @@index([status])
-  @@index([consentProvided])
-  @@index([matchScore])
-}
-
-model Document {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Document Info
-  title           String
-  type            DocumentType
-  description     String?
-  
-  // Generation
-  promptVersion   String?   // Version of prompt used
-  aiModel         String?   // "gemini-pro", "gemini-flash"
-  
-  // Content Storage
-  currentVersionId String?
-  versions        DocumentVersion[]
-  
-  // Metadata
-  wordCount       Int?
-  language        String    @default("English")
-  isGenerated     Boolean   @default(true)
-  isEdited        Boolean   @default(false)
-  
-  // Application Context
-  scholarshipId   String?
-  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
-  universityId    String?
-  university      University? @relation(fields: [universityId], references: [id])
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
-
-  @@index([userId])
-  @@index([type])
-  @@index([scholarshipId])
-  @@index([deletedAt])
-}
-
-enum DocumentType {
-  CV
-  SOP
-  MOTIVATION_LETTER
-  ESSAY
-  RECOMMENDATION_EMAIL
-  APPLICATION_EMAIL
-  OUTREACH_EMAIL
-  OTHER
-}
-
-model DocumentVersion {
-  id              String    @id @default(cuid())
-  documentId      String
-  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  
-  // Content
-  content         String    @db.Text
-  contentDelta    Json?     // For diff tracking
-  wordCount       Int?
-  
-  // Generation Context
-  generationPrompt String?   @db.Text // The actual prompt used
-  generationParams Json?     // { temperature, maxTokens, etc. }
-  
-  // Quality
-  aiScore         Float?    // Self-assessment of quality
-  userRating      Int?      // 1-5
-  
-  // Metadata
-  versionNumber   Int
-  isCurrent       Boolean   @default(false)
-  changeDescription String?
-  
-  createdAt       DateTime  @default(now())
-
-  @@index([documentId])
-  @@index([versionNumber])
-  @@index([isCurrent])
 }
 
 model Profile {
@@ -420,13 +45,11 @@ model Profile {
   dateOfBirth       DateTime?
   nationality       String?
   countryOfResidence String?
-  
   educationLevel    String?
   gpa               Float?
   fieldsOfInterest  String[]
   targetCountries   String[]
   budgetRange       Json?
-  
   fieldOfStudy      String?
   targetFields      String[]
   scholarshipTypes  String[]
@@ -437,7 +60,6 @@ model Profile {
   careerGoal        String?
   interests         String[]
   researchAreas     String[]
-  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -453,30 +75,24 @@ model Scholarship {
   provider          String
   providerType      String
   scholarshipType   String
-  
   country           String?
   continent         String?
   universityCountry String?
-  
   eligibilityRules  Json?
   targetFields      String[]
   targetNationalities String[]
   targetCountries   String[]
   educationLevels   String[]
-  
   amountMin         Int?
   amountMax         Int?
   amountCurrency    String    @default("USD")
-  
   applicationDeadline DateTime?
   decisionDate      DateTime?
   notificationDate  DateTime?
-  
   applicationURL    String?
   applicationFee    Int?
   requiredDocuments String[]
   essayPrompt       String?   @db.Text
-  
   requirements      Json?
   tags              String[]
   isVerified        Boolean   @default(false)
@@ -486,16 +102,13 @@ model Scholarship {
   source            String
   viewCount         Int       @default(0)
   matchCount        Int       @default(0)
-  
   createdBy         String?
   createdByUser     User?     @relation("UserScholarships", fields: [createdBy], references: [id])
   favoritedBy       Favorite[]
-
   recentlyPosted    Boolean   @default(false)
-
-  // NEW RELATIONS
-  images            Image[]   // ✅ ADD THIS
-  documents         Document[]  // ✅ ADD THIS
+  images            Image[]
+  documents         Document[]
+  deadlines         Deadline[]  // ✅ ADD THIS
 
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -511,7 +124,6 @@ model Scholarship {
   @@index([continent])
   @@index([universityCountry])
 }
-
 model Favorite {
   id              String    @id @default(cuid())
   userId          String
@@ -530,36 +142,25 @@ model Subscription {
   id                String    @id @default(cuid())
   userId            String    @unique
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   planType          PlanType  @default(FREE)
   planFeatures      Json?
-  
   status            SubscriptionStatus @default(ACTIVE)
-  
   amount            Int?
   currency          String    @default("USD")
   interval          String?
   trialEndsAt       DateTime?
-  
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   canceledAt        DateTime?
   pausedAt          DateTime?
-  
-  // Stripe fields
   stripeSubscriptionId String? @unique
   stripeCustomerId    String?
-  
-  // Chapa fields
-  chapaTransactionId  String?  @unique  // ✅ Added
-  chapaPaymentId      String?  @unique  // ✅ Added
-  chapaCheckoutUrl    String?  // ✅ Added
-  
+  chapaTransactionId  String?  @unique
+  chapaPaymentId      String?  @unique
+  chapaCheckoutUrl    String?
   cancellationReason String?
   retentionAttempts  Int       @default(0)
-  
   transactions      Transaction[]
-  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
@@ -569,6 +170,7 @@ model Subscription {
   @@index([currentPeriodEnd])
   @@index([planType])
 }
+
 enum PlanType {
   FREE
   PRO
@@ -586,29 +188,21 @@ enum SubscriptionStatus {
 
 model Transaction {
   id                String    @id @default(cuid())
-  
   userId            String?
   user              User?     @relation(fields: [userId], references: [id])
-  
   subscriptionId    String?
   subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
-  
   amountUSD         Int?
   amountETB         Int?
   exchangeRate      Float?
-  
   provider          PaymentProvider
   providerTransactionId String?
   providerStatus    String?
-  
   type              TransactionType
   status            TransactionStatus @default(PENDING)
-  
   idempotencyKey    String    @unique
-  
   metadata          Json?
   failureReason     String?
-  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -641,5 +235,389 @@ enum TransactionStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+  CANCELLED
+}
+
+// ============ UNIVERSITY MODELS ============
+
+model University {
+  id                String    @id @default(cuid())
+  name              String
+  shortName         String?
+  description       String?   @db.Text
+  website           String?
+  address           String?
+  country           String
+  city              String
+  postalCode        String?
+  latitude          Float?
+  longitude         Float?
+  foundedYear       Int?
+  publicPrivate     PublicPrivate?
+  enrollment        Int?
+  internationalRate Float?
+  acceptanceRate    Float?
+  ranking           Int?
+  admissionsEmail   String?
+  admissionsPhone   String?
+  internationalOffice String?
+  avgTuitionLocal   Int?
+  avgTuitionInternational Int?
+  avgLivingCosts    Int?
+  programs          Program[]
+  images            Image[]
+  tags              String[]
+  isVerified        Boolean   @default(false)
+  lastVerifiedAt    DateTime?
+  source            String
+  viewCount         Int       @default(0)
+  matches           UniversityMatch[]
+  outreachCampaigns OutreachCampaign[]
+  documents         Document[]
+  deadlines         Deadline[]  // ✅ ADD THIS
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([name])
+  @@index([country])
+  @@index([city])
+  @@index([latitude, longitude])
+  @@index([deletedAt])
+}
+
+enum PublicPrivate {
+  PUBLIC
+  PRIVATE
+  OTHER
+}
+
+model Program {
+  id                String    @id @default(cuid())
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  name              String
+  degreeLevel       DegreeLevel
+  field             String
+  specialization    String?
+  durationMonths    Int?
+  language          String    @default("English")
+  admissionRequirements Json?
+  tuitionLocal      Int?
+  tuitionInternational Int?
+  hasScholarships   Boolean   @default(false)
+  applicationDeadline DateTime?
+  startDate         DateTime?
+  endDate           DateTime?
+  isActive          Boolean   @default(true)
+  lastVerifiedAt    DateTime?
+  matches           UniversityMatch[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([universityId])
+  @@index([field])
+  @@index([degreeLevel])
+}
+
+enum DegreeLevel {
+  BACHELORS
+  MASTERS
+  PHD
+  CERTIFICATE
+  ASSOCIATE
+  OTHER
+}
+
+model UniversityMatch {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id])
+  programId         String?
+  program           Program?   @relation(fields: [programId], references: [id])
+  admissionProbability Float
+  probabilityRange  Json?
+  confidence        Float
+  fitScore          Float
+  financialFit      Float?
+  scoreBreakdown    Json?
+  methodology       String    @default("RULE_BASED")
+  positiveFactors   String[]
+  improvementAreas  String[]
+  summary           String?   @db.Text
+  matchType         String    @default("UNIVERSITY")
+  status            String    @default("PENDING")
+  version           String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([universityId])
+  @@index([admissionProbability])
+  @@index([status])
+}
+
+model Image {
+  id              String    @id @default(cuid())
+  universityId    String?
+  university      University? @relation(fields: [universityId], references: [id])
+  scholarshipId   String?
+  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
+  url             String
+  thumbnailUrl    String?
+  mediumUrl       String?
+  largeUrl        String?
+  source          ImageSource
+  sourceId        String?
+  attribution     Json?
+  alt             String?
+  caption         String?
+  width           Int?
+  height          Int?
+  fileSize        Int?
+  isVerified      Boolean   @default(false)
+  verificationNote String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([universityId])
+  @@index([scholarshipId])
+  @@index([source])
+  @@index([isVerified])
+}
+
+enum ImageSource {
+  MAPBOX
+  WIKIMEDIA
+  UNSPLASH
+  ADMIN_UPLOAD
+  USER_UPLOAD
+}
+
+model OutreachCampaign {
+  id                String    @id @default(cuid())
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id])
+  name              String
+  description       String?
+  status            String    @default("DRAFT")
+  targetCriteria    Json?
+  emailTemplate     String?   @db.Text
+  tone              String    @default("FORMAL")
+  branding          Json?
+  candidates        OutreachCandidate[]
+  sentCount         Int       @default(0)
+  openedCount       Int       @default(0)
+  repliedCount      Int       @default(0)
+  convertedCount    Int       @default(0)
+  createdBy         String
+  approvedBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([universityId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OutreachCandidate {
+  id                String    @id @default(cuid())
+  campaignId        String
+  campaign          OutreachCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  consentProvided   Boolean   @default(false)
+  consentGivenAt    DateTime?
+  consentVersion    String?
+  status            String    @default("PENDING")
+  emailSentAt       DateTime?
+  emailOpenedAt     DateTime?
+  emailRepliedAt    DateTime?
+  conversionStatus  String    @default("NOT_CONVERTED")
+  matchScore        Float?
+  matchExplanation  String?   @db.Text
+  matchVersion      String?
+  generatedEmail    String?   @db.Text
+  personalization   Json?
+  notes             String?   @db.Text
+  tags              String[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([campaignId])
+  @@index([userId])
+  @@index([status])
+  @@index([consentProvided])
+  @@index([matchScore])
+}
+
+// ============ DOCUMENT MODELS ============
+
+model Document {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  type            DocumentType
+  description     String?
+  promptVersion   String?
+  aiModel         String?
+  currentVersionId String?
+  versions        DocumentVersion[]
+  wordCount       Int?
+  language        String    @default("English")
+  isGenerated     Boolean   @default(true)
+  isEdited        Boolean   @default(false)
+  scholarshipId   String?
+  scholarship     Scholarship? @relation(fields: [scholarshipId], references: [id])
+  universityId    String?
+  university      University? @relation(fields: [universityId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([type])
+  @@index([scholarshipId])
+  @@index([deletedAt])
+}
+
+enum DocumentType {
+  CV
+  SOP
+  MOTIVATION_LETTER
+  ESSAY
+  RECOMMENDATION_EMAIL
+  APPLICATION_EMAIL
+  OUTREACH_EMAIL
+  OTHER
+}
+
+model DocumentVersion {
+  id              String    @id @default(cuid())
+  documentId      String
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content         String    @db.Text
+  contentDelta    Json?
+  wordCount       Int?
+  generationPrompt String?   @db.Text
+  generationParams Json?
+  aiScore         Float?
+  userRating      Int?
+  versionNumber   Int
+  isCurrent       Boolean   @default(false)
+  changeDescription String?
+  createdAt       DateTime  @default(now())
+
+  @@index([documentId])
+  @@index([versionNumber])
+  @@index([isCurrent])
+}
+
+// ============ DEADLINE MODELS ============
+
+model Deadline {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Context
+  title             String
+  description       String?
+  type              DeadlineType
+  
+  // Timing
+  dueDate           DateTime
+  dueTimezone       String    @default("UTC")
+  reminderOffset    Int?      // Minutes before due date
+  isCompleted       Boolean   @default(false)
+  completedAt       DateTime?
+  
+  // Related Entity
+  scholarshipId     String?
+  scholarship       Scholarship? @relation(fields: [scholarshipId], references: [id])
+  universityId      String?
+  university        University? @relation(fields: [universityId], references: [id])
+  
+  // Reminders
+  reminders         Reminder[]
+  
+  // Metadata
+  priority          Priority  @default(MEDIUM)
+  notes             String?   @db.Text
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([userId])
+  @@index([dueDate])
+  @@index([type])
+  @@index([isCompleted])
+  @@index([userId, dueDate])
+}
+
+enum DeadlineType {
+  APPLICATION
+  SCHOLARSHIP
+  ADMISSION
+  DOCUMENT
+  INTERVIEW
+  TEST
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Reminder {
+  id                String    @id @default(cuid())
+  deadlineId        String
+  deadline          Deadline  @relation(fields: [deadlineId], references: [id], onDelete: Cascade)
+  
+  // Schedule
+  scheduledAt       DateTime
+  sentAt            DateTime?
+  
+  // Content
+  channel           Channel
+  status            ReminderStatus @default(PENDING)
+  
+  // Metadata
+  attempts          Int       @default(0)
+  errorMessage      String?
+  
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([deadlineId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+enum Channel {
+  EMAIL
+  IN_APP
+  PUSH
+  SMS
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  FAILED
   CANCELLED
 }
