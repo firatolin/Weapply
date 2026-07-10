@@ -27,49 +27,83 @@ export class FXService {
     if (this.cache.rate && this.cache.timestamp) {
       const age = Date.now() - this.cache.timestamp;
       if (age < this.CACHE_TTL) {
+        console.log(`📊 Using cached rate: 1 USD = ${this.cache.rate} ETB`);
         return this.cache.rate;
       }
     }
 
-    try {
-      // Try Frankfurter API first
-      const response = await axios.get<ExchangeRateResponse>(
-        'https://api.frankfurter.app/latest?from=USD&to=ETB'
-      );
-      
-      const rate = response.data.rates.ETB;
-      
-      // Update cache
-      this.cache.rate = rate;
-      this.cache.timestamp = Date.now();
-      
-      return rate;
-    } catch (error) {
-      console.warn('⚠️ Frankfurter API failed, trying fallback...');
-      
-      // Fallback: ExchangeRate.host
-      try {
-        const response = await axios.get(
-          'https://api.exchangerate.host/convert?from=USD&to=ETB'
+    const sources = [
+      // Primary: Frankfurter
+      async () => {
+        const response = await axios.get<ExchangeRateResponse>(
+          'https://api.frankfurter.app/latest?from=USD&to=ETB',
+          { timeout: 5000 }
         );
-        const rate = response.data.result;
-        
-        this.cache.rate = rate;
-        this.cache.timestamp = Date.now();
-        
-        return rate;
-      } catch (fallbackError) {
-        console.warn('⚠️ ExchangeRate.host failed, using cached or default rate...');
-        
-        // Last resort: return cached rate or default
-        if (this.cache.rate) {
-          return this.cache.rate;
+        return response.data.rates.ETB;
+      },
+      // Fallback 1: ExchangeRate.host
+      async () => {
+        const response = await axios.get(
+          'https://api.exchangerate.host/convert?from=USD&to=ETB',
+          { timeout: 5000 }
+        );
+        return response.data.result;
+      },
+      // Fallback 2: exchangerate-api.com (free, no API key needed)
+      async () => {
+        const response = await axios.get(
+          'https://api.exchangerate-api.com/v4/latest/USD',
+          { timeout: 5000 }
+        );
+        return response.data.rates.ETB;
+      },
+      // Fallback 3: Currency API (jsdelivr CDN)
+      async () => {
+        const response = await axios.get(
+          'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json',
+          { timeout: 5000 }
+        );
+        return response.data.usd.etb;
+      },
+      // Fallback 4: ExchangeRate-API (free tier)
+      async () => {
+        const response = await axios.get(
+          'https://open.er-api.com/v6/latest/USD',
+          { timeout: 5000 }
+        );
+        return response.data.rates.ETB;
+      },
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const source of sources) {
+      try {
+        const rate = await source();
+        if (rate && rate > 0) {
+          // Update cache
+          this.cache.rate = rate;
+          this.cache.timestamp = Date.now();
+          console.log(`✅ Exchange rate updated: 1 USD = ${rate} ETB`);
+          return rate;
         }
-        
-        // Default rate (fallback)
-        return 1620; // 1 USD ≈ 1620 ETB (approximate)
+      } catch (error) {
+        console.warn(`⚠️ FX source failed:`, error);
+        lastError = error as Error;
+        // Continue to next source
       }
     }
+
+    // Last resort: return cached rate or default
+    if (this.cache.rate) {
+      console.log(`📊 Using cached rate: 1 USD = ${this.cache.rate} ETB`);
+      return this.cache.rate;
+    }
+
+    // Default fallback rate (will be updated when API works)
+    const defaultRate = 162.00;
+    console.log(`⚠️ Using default rate: 1 USD = ${defaultRate} ETB`);
+    return defaultRate;
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -44,6 +45,7 @@ export function Header() {
           Weapply
         </Link>
         <nav className="flex items-center gap-6">
+          <CurrencySwitcher />
           <Link to="/scholarships" className="text-sm hover:text-primary">
             Scholarships
           </Link>

@@ -14,6 +14,7 @@ import { matchingRouter } from './routes/matching.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
 import { adminRouter } from './routes/admin.routes.js';
 import { documentRouter } from './routes/documents.routes.js';
+// import { deadlineRouter } from './routes/deadlines.routes.js';
 
 const app = express();
 const port = config.PORT;
@@ -28,18 +29,25 @@ app.use(cors({
 // Compression
 app.use(compression());
 
-// Body parsing - order matters!
+// Raw body parser for Stripe and Chapa webhooks
+// MUST come BEFORE express.json()
 app.use((req, res, next) => {
-  if (req.path === '/api/v1/payment/webhook/stripe') {
-    // Use express.raw() for webhook route
-    express.raw({ type: 'application/json' })(req, res, next);
+  if (req.path === '/api/v1/payment/webhook/stripe' || req.path === '/api/v1/payment/webhook/chapa') {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      (req as any).rawBody = data;
+      next();
+    });
   } else {
-    // Use JSON parser for all other routes
-    express.json({ limit: '10mb' })(req, res, next);
+    next();
   }
 });
 
-// URL encoded for all routes
+// Body parsing - JSON parser runs AFTER raw body collection
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Rate limiting
@@ -89,6 +97,7 @@ app.use('/api/v1/matches', matchingRouter);
 app.use('/api/v1/payment', paymentRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/documents', documentRouter);
+// app.use('/api/v1/deadlines', deadlineRouter);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

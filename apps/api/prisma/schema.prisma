@@ -546,9 +546,14 @@ model Subscription {
   canceledAt        DateTime?
   pausedAt          DateTime?
   
+  // Stripe fields
   stripeSubscriptionId String? @unique
   stripeCustomerId    String?
-  chapaTransactionId  String?  @unique
+  
+  // Chapa fields
+  chapaTransactionId  String?  @unique  // ✅ Added
+  chapaPaymentId      String?  @unique  // ✅ Added
+  chapaCheckoutUrl    String?  // ✅ Added
   
   cancellationReason String?
   retentionAttempts  Int       @default(0)
@@ -564,7 +569,6 @@ model Subscription {
   @@index([currentPeriodEnd])
   @@index([planType])
 }
-
 enum PlanType {
   FREE
   PRO
