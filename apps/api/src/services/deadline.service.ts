@@ -3,53 +3,169 @@ import { Deadline, Reminder, Priority } from '@prisma/client';
 
 export class DeadlineService {
   /**
-   * Create a new deadline
+   * Auto-create deadlines from scholarships
+   * This runs when a scholarship is created or updated
    */
-  static async createDeadline(data: {
-    userId: string;
-    title: string;
-    description?: string;
-    type: string;
-    dueDate: Date;
-    dueTimezone?: string;
-    reminderOffset?: number;
-    scholarshipId?: string;
-    universityId?: string;
-    priority?: string;
-    notes?: string;
-  }) {
-    const deadline = await prisma.deadline.create({
-      data: {
-        ...data,
-        dueTimezone: data.dueTimezone || 'UTC',
-        priority: data.priority as Priority || 'MEDIUM',
-      },
-      include: {
-        scholarship: true,
-        university: true,
-      },
-    });
-
-    // Create reminder if reminderOffset is set
-    if (data.reminderOffset && data.reminderOffset > 0) {
-      const reminderDate = new Date(data.dueDate);
-      reminderDate.setMinutes(reminderDate.getMinutes() - data.reminderOffset);
-      
-      await prisma.reminder.create({
-        data: {
-          deadlineId: deadline.id,
-          scheduledAt: reminderDate,
-          channel: 'EMAIL',
-          status: 'PENDING',
+  static async autoCreateDeadlinesFromScholarship(scholarshipId: string) {
+    try {
+      // Get the scholarship with all details
+      const scholarship = await prisma.scholarship.findUnique({
+        where: { id: scholarshipId, deletedAt: null },
+        include: {
+          createdByUser: true,
         },
       });
-    }
 
-    return deadline;
+      if (!scholarship) {
+        console.log('❌ Scholarship not found:', scholarshipId);
+        return;
+      }
+
+      // Check if scholarship has a deadline
+      if (!scholarship.applicationDeadline) {
+        console.log(`⏭️ Scholarship "${scholarship.name}" has no deadline, skipping`);
+        return;
+      }
+
+      console.log(`📅 Auto-creating deadline for scholarship: ${scholarship.name}`);
+
+      // Find all users who might be interested (for now, we'll link to the creator)
+      // In production, this would be all users who favorited or applied to this scholarship
+      const users = await prisma.user.findMany({
+        where: {
+          favorites: {
+            some: {
+              scholarshipId: scholarship.id,
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      // Also include the creator
+      if (scholarship.createdBy) {
+        users.push({ id: scholarship.createdBy });
+      }
+
+      // Remove duplicates
+      const uniqueUserIds = [...new Set(users.map(u => u.id))];
+
+      console.log(`👤 Creating deadlines for ${uniqueUserIds.length} users`);
+
+      // Create deadlines for each user
+      for (const userId of uniqueUserIds) {
+        // Check if deadline already exists
+        const existing = await prisma.deadline.findFirst({
+          where: {
+            userId,
+            scholarshipId: scholarship.id,
+            deletedAt: null,
+          },
+        });
+
+        if (existing) {
+          // Update existing deadline if needed
+          await prisma.deadline.update({
+            where: { id: existing.id },
+            data: {
+              dueDate: scholarship.applicationDeadline,
+              title: `Apply: ${scholarship.name}`,
+              description: scholarship.description || `Application deadline for ${scholarship.name}`,
+              updatedAt: new Date(),
+            },
+          });
+          console.log(`✅ Updated deadline for user ${userId}`);
+        } else {
+          // Create new deadline
+          await prisma.deadline.create({
+            data: {
+              userId,
+              title: `Apply: ${scholarship.name}`,
+              description: scholarship.description || `Application deadline for ${scholarship.name}`,
+              type: 'SCHOLARSHIP',
+              dueDate: scholarship.applicationDeadline,
+              scholarshipId: scholarship.id,
+              priority: 'HIGH',
+              reminderOffset: 7 * 24 * 60, // 7 days before
+            },
+          });
+          console.log(`✅ Created deadline for user ${userId}`);
+        }
+      }
+
+      console.log(`✅ Auto-created deadlines for scholarship: ${scholarship.name}`);
+    } catch (error) {
+      console.error('❌ Error auto-creating deadlines:', error);
+    }
   }
 
   /**
-   * Get user's deadlines
+   * Update deadlines when scholarship is updated
+   */
+  static async updateDeadlinesFromScholarship(scholarshipId: string) {
+    try {
+      const scholarship = await prisma.scholarship.findUnique({
+        where: { id: scholarshipId, deletedAt: null },
+      });
+
+      if (!scholarship) {
+        console.log('❌ Scholarship not found:', scholarshipId);
+        return;
+      }
+
+      if (!scholarship.applicationDeadline) {
+        // If no deadline, delete all related deadlines
+        await prisma.deadline.updateMany({
+          where: {
+            scholarshipId: scholarship.id,
+            deletedAt: null,
+          },
+          data: { deletedAt: new Date() },
+        });
+        console.log(`🗑️ Removed deadlines for scholarship: ${scholarship.name}`);
+        return;
+      }
+
+      // Update all existing deadlines
+      await prisma.deadline.updateMany({
+        where: {
+          scholarshipId: scholarship.id,
+          deletedAt: null,
+        },
+        data: {
+          dueDate: scholarship.applicationDeadline,
+          title: `Apply: ${scholarship.name}`,
+          description: scholarship.description || `Application deadline for ${scholarship.name}`,
+          updatedAt: new Date(),
+        },
+      });
+
+      console.log(`✅ Updated deadlines for scholarship: ${scholarship.name}`);
+    } catch (error) {
+      console.error('❌ Error updating deadlines:', error);
+    }
+  }
+
+  /**
+   * Delete deadlines when scholarship is deleted
+   */
+  static async deleteDeadlinesFromScholarship(scholarshipId: string) {
+    try {
+      await prisma.deadline.updateMany({
+        where: {
+          scholarshipId,
+          deletedAt: null,
+        },
+        data: { deletedAt: new Date() },
+      });
+      console.log(`🗑️ Removed deadlines for scholarship: ${scholarshipId}`);
+    } catch (error) {
+      console.error('❌ Error deleting deadlines:', error);
+    }
+  }
+
+  /**
+   * Get user's deadlines (including auto-created from scholarships)
    */
   static async getUserDeadlines(userId: string) {
     return prisma.deadline.findMany({
@@ -64,6 +180,7 @@ export class DeadlineService {
             id: true,
             name: true,
             provider: true,
+            isVerified: true,
           },
         },
         university: {
@@ -79,7 +196,7 @@ export class DeadlineService {
   }
 
   /**
-   * Get upcoming deadlines
+   * Get upcoming deadlines (including auto-created from scholarships)
    */
   static async getUpcomingDeadlines(userId: string, days = 30) {
     const now = new Date();
@@ -103,6 +220,7 @@ export class DeadlineService {
             id: true,
             name: true,
             provider: true,
+            isVerified: true,
           },
         },
         university: {
@@ -136,23 +254,9 @@ export class DeadlineService {
   }
 
   /**
-   * Update a deadline
+   * Mark deadline as completed
    */
-  static async updateDeadline(
-    id: string,
-    userId: string,
-    data: Partial<{
-      title: string;
-      description: string;
-      type: string;
-      dueDate: Date;
-      dueTimezone: string;
-      reminderOffset: number;
-      priority: string;
-      notes: string;
-      isCompleted: boolean;
-    }>
-  ) {
+  static async markComplete(id: string, userId: string) {
     const existing = await prisma.deadline.findFirst({
       where: { id, userId, deletedAt: null },
     });
@@ -163,22 +267,15 @@ export class DeadlineService {
 
     return prisma.deadline.update({
       where: { id },
-      data,
+      data: {
+        isCompleted: true,
+        completedAt: new Date(),
+      },
       include: {
         reminders: true,
         scholarship: true,
         university: true,
       },
-    });
-  }
-
-  /**
-   * Mark deadline as completed
-   */
-  static async markComplete(id: string, userId: string) {
-    return this.updateDeadline(id, userId, {
-      isCompleted: true,
-      completedAt: new Date(),
     });
   }
 
@@ -205,37 +302,58 @@ export class DeadlineService {
   }
 
   /**
-   * Auto-create deadlines from scholarship
+   * Get deadline statistics for a user
    */
-  static async createFromScholarship(userId: string, scholarshipId: string) {
-    const scholarship = await prisma.scholarship.findUnique({
-      where: { id: scholarshipId, deletedAt: null },
+  static async getDeadlineStats(userId: string) {
+    const total = await prisma.deadline.count({
+      where: { userId, deletedAt: null },
     });
 
-    if (!scholarship || !scholarship.applicationDeadline) {
-      throw new Error('Scholarship not found or no deadline');
-    }
+    const completed = await prisma.deadline.count({
+      where: { userId, deletedAt: null, isCompleted: true },
+    });
 
-    const existing = await prisma.deadline.findFirst({
+    const upcoming = await prisma.deadline.count({
       where: {
         userId,
-        scholarshipId,
         deletedAt: null,
+        isCompleted: false,
+        dueDate: { gte: new Date() },
       },
     });
 
-    if (existing) {
-      return existing;
-    }
+    const overdue = await prisma.deadline.count({
+      where: {
+        userId,
+        deletedAt: null,
+        isCompleted: false,
+        dueDate: { lt: new Date() },
+      },
+    });
 
-    return this.createDeadline({
-      userId,
-      title: `Apply: ${scholarship.name}`,
-      description: `Application deadline for ${scholarship.name}`,
-      type: 'SCHOLARSHIP',
-      dueDate: scholarship.applicationDeadline,
-      scholarshipId: scholarship.id,
-      reminderOffset: 7 * 24 * 60,
+    return { total, completed, upcoming, overdue };
+  }
+
+  /**
+   * Get deadlines for a specific scholarship
+   */
+  static async getDeadlinesForScholarship(scholarshipId: string) {
+    return prisma.deadline.findMany({
+      where: {
+        scholarshipId,
+        deletedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+          },
+        },
+        reminders: true,
+      },
+      orderBy: { dueDate: 'asc' },
     });
   }
 }

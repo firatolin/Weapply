@@ -50,6 +50,7 @@ interface Deadline {
     id: string;
     name: string;
     provider: string;
+    isVerified?: boolean;
   };
   university?: {
     id: string;
@@ -290,118 +291,17 @@ export function DeadlinesPage() {
             Track your scholarship and university application deadlines
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Deadline
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Add New Deadline</DialogTitle>
-              <DialogDescription>
-                Create a new deadline to track your applications.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateSubmit}>
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g. MIT Application Deadline"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="type">Type</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => setFormData({ ...formData, type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="APPLICATION">Application</SelectItem>
-                      <SelectItem value="SCHOLARSHIP">Scholarship</SelectItem>
-                      <SelectItem value="ADMISSION">Admission</SelectItem>
-                      <SelectItem value="DOCUMENT">Document</SelectItem>
-                      <SelectItem value="INTERVIEW">Interview</SelectItem>
-                      <SelectItem value="TEST">Test</SelectItem>
-                      <SelectItem value="OTHER">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="dueDate">Due Date *</Label>
-                  <Input
-                    id="dueDate"
-                    type="datetime-local"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(value) => setFormData({ ...formData, priority: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="LOW">Low</SelectItem>
-                      <SelectItem value="MEDIUM">Medium</SelectItem>
-                      <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="URGENT">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Add details about this deadline..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Additional notes..."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={2}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Deadline'
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <div className="flex justify-between items-center mb-6">
+            <div>
+                <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Calendar className="h-8 w-8" />
+                Deadlines
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                Deadlines are automatically created from scholarships you've favorited or applied to
+                </p>
+            </div>
+        </div>
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
@@ -669,7 +569,30 @@ function DeadlineCard({
               <Badge variant="outline">{getTypeLabel(deadline.type)}</Badge>
             </div>
             <CardDescription className="mt-1">
-              {deadline.scholarship?.name || deadline.university?.name || 'No related entity'}
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+  {deadline.scholarship ? (
+    <>
+      <Link
+        to={`/scholarships/${deadline.scholarship.id}`}
+        className="text-sm font-medium text-blue-600 hover:underline"
+      >
+        {deadline.scholarship.name}
+      </Link>
+
+      {deadline.scholarship.isVerified && (
+        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+          ✓ Verified
+        </Badge>
+      )}
+    </>
+  ) : deadline.university ? (
+    <CardDescription>
+      {deadline.university.name}
+    </CardDescription>
+  ) : (
+    <CardDescription>No related entity</CardDescription>
+  )}
+</div>
             </CardDescription>
           </div>
           <div className="flex gap-2">

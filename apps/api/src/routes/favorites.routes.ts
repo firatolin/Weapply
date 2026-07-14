@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/error.js';
+import { DeadlineService } from '../services/deadline.service.js';
 
 const router = Router();
 
@@ -90,12 +91,28 @@ router.post('/:scholarshipId', authMiddleware, async (req: AuthRequest, res: Res
     const favorite = await prisma.favorite.create({
       data: {
         userId: req.user.id,
-        scholarshipId: scholarshipId,
+        scholarshipId,
       },
       include: {
         scholarship: true,
       },
     });
+
+// Auto-create deadline for this scholarship
+if (favorite.scholarship?.applicationDeadline) {
+  try {
+    await DeadlineService.autoCreateDeadlinesFromScholarship(scholarshipId);
+  } catch (error) {
+    console.error('⚠️ Failed to auto-create deadline:', error);
+    // Don't fail the favorite request if deadline creation fails
+  }
+}
+
+res.status(201).json({
+  success: true,
+  message: 'Added to favorites',
+  data: favorite.scholarship,
+});
 
     res.status(201).json({
       success: true,

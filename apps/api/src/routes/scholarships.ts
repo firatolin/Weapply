@@ -4,6 +4,7 @@ import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/error.js';
 import { authMiddleware, AuthRequest } from '../middleware/auth.js';
 import { requireStaff, requireAdmin } from '../middleware/roles.js';
+import { DeadlineService } from '../services/deadline.service.js';
 
 const router: Router = Router();
 
@@ -303,6 +304,17 @@ router.post('/', authMiddleware, requireStaff, async (req: AuthRequest, res: Res
         },
       },
     });
+    
+    // Auto-create deadlines for users who have this scholarship
+    if (scholarship.applicationDeadline) {
+      try {
+        await DeadlineService.autoCreateDeadlinesFromScholarship(
+          scholarship.id
+        );
+      } catch (error) {
+        console.error('⚠️ Failed to auto-create deadlines:', error);
+      }
+    }
 
     res.status(201).json({
       message: 'Scholarship created successfully',
@@ -340,8 +352,7 @@ router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest,
       where: { id },
       data: {
         isVerified: verified,
-        lastVerifiedAt: verified ? new Date() : null,
-        verifiedBy: verified ? req.user?.id : null,
+        verifiedBy: req.user?.id,
       },
       include: {
         createdByUser: {
@@ -349,6 +360,7 @@ router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest,
             id: true,
             displayName: true,
             email: true,
+            role: true,
           },
         },
         verifiedByUser: {
@@ -360,6 +372,13 @@ router.put('/:id/verify', authMiddleware, requireAdmin, async (req: AuthRequest,
         },
       },
     });
+    
+    // Update deadlines if the scholarship deadline changed
+    try {
+      await DeadlineService.updateDeadlinesFromScholarship(id);
+    } catch (error) {
+      console.error('⚠️ Failed to update deadlines:', error);
+    }
 
     res.json({
       success: true,
